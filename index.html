@@ -117,6 +117,15 @@ td{padding:12px 14px;white-space:nowrap}
   justify-content:center;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700}
 .ops-t{font-weight:600;font-size:13px;margin-bottom:3px}
 .ops-d{font-size:12px;color:var(--muted);line-height:1.6}
+.run-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+  padding:14px;margin-top:20px;background:var(--accent);color:#0a0c0f;
+  font-family:'Noto Sans TC',sans-serif;font-weight:700;font-size:14px;letter-spacing:3px;
+  border:none;border-radius:2px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.run-btn::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);
+  transform:translateX(-100%);transition:transform .4s}
+.run-btn:hover::after{transform:translateX(100%)}
+.run-btn:hover{background:#f7c948;box-shadow:0 0 24px rgba(240,180,41,.3)}
 @media(max-width:1100px){.grid3{grid-template-columns:repeat(2,1fr)}.filters-grid{grid-template-columns:repeat(2,1fr)}.ops-grid{grid-template-columns:1fr}}
 @media(max-width:700px){.grid3,.grid5{grid-template-columns:1fr}main{padding:16px}}
 </style>
@@ -167,19 +176,53 @@ td{padding:12px 14px;white-space:nowrap}
     <div class="card-title-sm">第一波強勢領漲</div><div class="card-desc">類股龍頭，起漲優於大盤</div><div class="card-dot"></div></div>
 </div>
 
-<div class="sec-title">篩選條件</div>
+<div class="sec-title">篩選條件設定</div>
 <div class="filter-panel">
   <div class="filters-grid">
     <div class="filter-group">
-      <div class="filter-label"><span class="dot" style="background:#68d391"></span>均線排列</div>
-      <select class="f-select" id="f-ma" onchange="render()">
+      <div class="filter-label"><span class="dot" style="background:#4299e1"></span>型態篩選</div>
+      <select class="f-select" id="f-pattern" onchange="render()">
         <option value="">全部</option>
-        <option value="四線多排">四線多排（5/10/20/60）</option>
-        <option value="有趨勢">有趨勢訊號</option>
+        <option value="盤整突破">盤整突破</option>
+        <option value="回後買上漲">回後買上漲</option>
       </select>
     </div>
     <div class="filter-group">
-      <div class="filter-label"><span class="dot" style="background:#f6c650"></span>進場策略</div>
+      <div class="filter-label"><span class="dot" style="background:#68d391"></span>均線多頭排列</div>
+      <select class="f-select" id="f-ma" onchange="render()">
+        <option value="">全部</option>
+        <option value="四線多排">四線多排（5/10/20/60）</option>
+        <option value="有趨勢">三線多排（5/10/20）</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label"><span class="dot" style="background:#f6c650"></span>成交量條件</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input class="f-input" type="number" id="f-vol" value="1" min="1" step="0.1" onchange="render()" style="width:80px"> 倍均量
+      </div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label"><span class="dot" style="background:#b794f4"></span>底部打底天數</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input class="f-input" type="number" id="f-days" value="0" min="0" onchange="render()" style="width:80px"> 天以上
+      </div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label"><span class="dot" style="background:#fc8181"></span>最低飆股評分</div>
+      <input class="f-input" type="number" id="f-score" value="65" min="0" max="100" onchange="render()">
+    </div>
+    <div class="filter-group">
+      <div class="filter-label"><span class="dot" style="background:#4299e1"></span>市值規模</div>
+      <select class="f-select" id="f-cap" onchange="render()">
+        <option value="">全部</option>
+        <option value="大型股">大型股</option>
+        <option value="中型股">中型股</option>
+        <option value="小型股">小型股</option>
+        <option value="微型股">微型股</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label"><span class="dot" style="background:#68d391"></span>進場策略</div>
       <select class="f-select" id="f-entry" onchange="render()">
         <option value="">全部</option>
         <option value="盤整突破">盤整突破</option>
@@ -188,31 +231,34 @@ td{padding:12px 14px;white-space:nowrap}
       </select>
     </div>
     <div class="filter-group">
-      <div class="filter-label"><span class="dot" style="background:#b794f4"></span>最低評分</div>
-      <input class="f-input" type="number" id="f-score" value="65" min="0" max="100" onchange="render()">
+      <div class="filter-label"><span class="dot" style="background:#f6c650"></span>產業別</div>
+      <select class="f-select" id="f-ind" onchange="render()">
+        <option value="">全部產業</option>
+        <option value="半導體">半導體</option><option value="航運">航運</option><option value="其他">其他</option>
+      </select>
     </div>
-    <div class="filter-group">
-      <div class="filter-label"><span class="dot" style="background:#fc8181"></span>最低爆量倍數</div>
-      <input class="f-input" type="number" id="f-vol" value="1" min="1" step="0.1" onchange="render()">
-    </div>
   </div>
+
   <div class="toggle-row">
-    <span class="toggle-label">產業：</span>
-    <button class="toggle-btn on" data-type="industry" data-val="" onclick="setFilter('industry','',this)">全部</button>
-    <button class="toggle-btn" data-type="industry" data-val="電子零組件" onclick="toggleFilter(this)">電子零組件</button><button class="toggle-btn" data-type="industry" data-val="其他" onclick="toggleFilter(this)">其他</button>
+    <span class="toggle-label">附加條件：</span>
+    <button class="toggle-btn on" data-extra="new_high" onclick="toggleExtra(this)">股價創20日新高</button>
+    <button class="toggle-btn on" data-extra="ma_bull4" onclick="toggleExtra(this)">均線四線多排</button>
+    <button class="toggle-btn" data-extra="breakout_vol" onclick="toggleExtra(this)">突破量 ≥ 2倍</button>
+    <button class="toggle-btn" data-extra="momentum" onclick="toggleExtra(this)">5日動能 ≥ 3%</button>
   </div>
+
   <div class="toggle-row">
-    <span class="toggle-label">市值：</span>
-    <button class="toggle-btn on" data-type="cap" data-val="" onclick="setFilter('cap','',this)">全部</button>
-    <button class="toggle-btn" data-type="cap" data-val="中型股" onclick="toggleFilter(this)">中型股</button><button class="toggle-btn" data-type="cap" data-val="小型股" onclick="toggleFilter(this)">小型股</button>
-  </div>
-  <div class="toggle-row">
-    <span class="toggle-label">訊號：</span>
+    <span class="toggle-label">訊號篩選：</span>
     <button class="toggle-btn" data-sig="型態" onclick="toggleSig(this)">型態</button>
     <button class="toggle-btn" data-sig="籌碼" onclick="toggleSig(this)">籌碼</button>
     <button class="toggle-btn" data-sig="趨勢" onclick="toggleSig(this)">趨勢</button>
     <button class="toggle-btn" data-sig="動能" onclick="toggleSig(this)">動能</button>
   </div>
+
+  <button class="run-btn" onclick="render()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    套用篩選條件
+  </button>
 </div>
 
 <div class="results-hdr">
@@ -273,24 +319,34 @@ td{padding:12px 14px;white-space:nowrap}
 
 </main>
 <script>
-const ALL = [{"code": "6757", "price": 50.9, "chg": 2.52, "score": 75, "signals": ["籌碼", "型態", "動能"], "consolidation_days": 21, "vol_ratio": 1.58, "momentum_5d": 6.82, "entry": "觀察等待", "ma_bull4": false, "industry": "其他", "name": "台灣虎航-創", "cap_size": "小型股"}, {"code": "8091", "price": 197.0, "chg": 2.6, "score": 70, "signals": ["趨勢", "型態", "動能"], "consolidation_days": 20, "vol_ratio": 1.14, "momentum_5d": 8.24, "entry": "回後買上漲", "ma_bull4": true, "industry": "電子零組件", "name": "翔名", "cap_size": "中型股"}, {"code": "4958", "price": 432.5, "chg": 2.73, "score": 70, "signals": ["趨勢", "籌碼", "型態", "動能"], "consolidation_days": 9, "vol_ratio": 1.57, "momentum_5d": 24.46, "entry": "觀察等待", "ma_bull4": true, "industry": "其他", "name": "臻鼎-KY", "cap_size": "中型股"}];
-let sKey='score', sDir=-1, actInd='', actCap='', actSigs=new Set();
+const ALL = [{"code": "8438", "price": 94.6, "chg": 7.13, "score": 100, "signals": ["趨勢", "型態", "籌碼", "動能"], "consolidation_days": 11, "vol_ratio": 0.19, "momentum_5d": 11.29, "entry": "回後買上漲", "ma_bull4": true, "details": {"breakout": true, "over_prev_high": true, "support_hold": true, "pullback_pct": 2.47, "body_pct": 6.77}, "industry": "其他", "name": "昶昕", "cap_size": "小型股"}, {"code": "6757", "price": 50.9, "chg": 2.52, "score": 85, "signals": ["型態", "籌碼", "動能"], "consolidation_days": 21, "vol_ratio": 1.58, "momentum_5d": 6.82, "entry": "盤整突破", "ma_bull4": false, "details": {"breakout": true, "over_prev_high": true, "support_hold": true, "pullback_pct": 0.39, "body_pct": 1.8}, "industry": "航運", "name": "台灣虎航", "cap_size": "小型股"}, {"code": "8091", "price": 197.0, "chg": 2.6, "score": 80, "signals": ["型態", "趨勢", "動能"], "consolidation_days": 20, "vol_ratio": 1.14, "momentum_5d": 8.24, "entry": "盤整突破", "ma_bull4": true, "details": {"breakout": true, "over_prev_high": true, "support_hold": true, "pullback_pct": 1.25, "body_pct": -0.76}, "industry": "半導體", "name": "翔名", "cap_size": "中型股"}];
+let sKey='score', sDir=-1, actSigs=new Set(), actExtras=new Set(['new_high','ma_bull4']);
 
 const sc = n => n>=90?'#38a169':n>=80?'#ca8a04':'#dc2626';
 
 function getFiltered(){
-  const ms=+document.getElementById('f-score').value||0;
-  const mv=+document.getElementById('f-vol').value||1;
-  const ef=document.getElementById('f-entry').value;
-  const mf=document.getElementById('f-ma').value;
+  const ms  = +document.getElementById('f-score').value||0;
+  const mv  = +document.getElementById('f-vol').value||1;
+  const md  = +document.getElementById('f-days').value||0;
+  const ef  = document.getElementById('f-entry').value;
+  const mf  = document.getElementById('f-ma').value;
+  const pf  = document.getElementById('f-pattern').value;
+  const cf  = document.getElementById('f-cap').value;
+  const inf = document.getElementById('f-ind').value;
   return ALL.filter(s=>{
     if(s.score<ms) return false;
     if(s.vol_ratio<mv) return false;
+    if(s.consolidation_days<md) return false;
     if(ef && s.entry!==ef) return false;
+    if(pf && s.entry!==pf) return false;
     if(mf==='四線多排' && !s.ma_bull4) return false;
     if(mf==='有趨勢' && !s.signals.includes('趨勢')) return false;
-    if(actInd && s.industry!==actInd) return false;
-    if(actCap && s.cap_size!==actCap) return false;
+    if(cf && s.cap_size!==cf) return false;
+    if(inf && s.industry!==inf) return false;
+    if(actExtras.has('new_high') && !(s.details&&s.details.breakout)) return false;
+    if(actExtras.has('ma_bull4') && !s.ma_bull4) return false;
+    if(actExtras.has('breakout_vol') && s.vol_ratio<2) return false;
+    if(actExtras.has('momentum') && s.momentum_5d<3) return false;
     if(actSigs.size>0 && ![...actSigs].some(sig=>s.signals.includes(sig))) return false;
     return true;
   }).sort((a,b)=>{
@@ -329,23 +385,16 @@ function render(){
   }).join('');
 }
 
-function setFilter(type,val,btn){
-  if(type==='industry')actInd=val;
-  else actCap=val;
-  document.querySelectorAll(`[data-type="${type}"]`).forEach(b=>b.classList.remove('on'));
-  btn.classList.add('on');
-  render();
-}
-
-function toggleFilter(btn){
-  setFilter(btn.dataset.type,btn.dataset.val,btn);
+function toggleExtra(btn){
+  const key=btn.dataset.extra;
+  if(actExtras.has(key)){actExtras.delete(key);btn.classList.remove('on');}
+  else{actExtras.add(key);btn.classList.add('on');}
 }
 
 function toggleSig(btn){
   const sig=btn.dataset.sig;
   if(actSigs.has(sig)){actSigs.delete(sig);btn.classList.remove('on');}
   else{actSigs.add(sig);btn.classList.add('on');}
-  render();
 }
 
 function sortBy(key,th){
