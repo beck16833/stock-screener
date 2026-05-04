@@ -28,7 +28,7 @@ CRITERIA = {
     "min_volume_ratio"      : 1.0,
     "min_score"             : 55,
     "min_price"             : 10,      # 過濾低價股
-    "min_volume_daily"      :  200000,  # 最低日均量（張）
+    "min_volume_daily"      : 2000,  # 最低日均量（張）
 }
 
 # ── 產業分類對照表 ──────────────────────────────────────
@@ -207,27 +207,27 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
 
     # 條件1：底部打底 ≥ 20天（地基紮實）—— 核心條件
     if consolidation_days >= 20:
-        score_b += 30
+        score_b += 35
         sigs_b.append("型態")
     elif consolidation_days >= 10:
-        score_b += 15
+        score_b += 18
         sigs_b.append("型態")
 
     # 條件2：突破近20日高點 —— 核心條件
     if is_breakout:
-        score_b += 25
+        score_b += 30
         if "型態" not in sigs_b:
             sigs_b.append("型態")
 
     # 條件3：過昨日最高點（確認突破有效）
     if over_prev_h:
-        score_b += 15
+        score_b += 20
 
-    # 條件4：爆量 ≥ 2x（主力進場）
-    if vol_ratio >= 2.0:
+    # 條件4：爆量 ≥ 1.5x（主力進場）
+    if vol_ratio >= 1.5:
         score_b += 20
         sigs_b.append("籌碼")
-    elif vol_ratio >= 1.5:
+    elif vol_ratio >= 1.2:
         score_b += 10
         sigs_b.append("籌碼")
 
@@ -306,7 +306,7 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
     result_score  = 0
     result_sigs   = []
 
-    if breakout_valid and score_b >= MIN_SCORE:
+      if breakout_valid and score_b >= MIN_SCORE:
         result_entry = "盤整突破"
         result_score = min(score_b, 100)
         result_sigs  = sigs_b
