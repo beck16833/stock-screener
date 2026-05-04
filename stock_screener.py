@@ -27,7 +27,7 @@ CRITERIA = {
     "min_consolidation_days": 10,
     "min_volume_ratio"      : 1.0,
     "min_score"             : 55,
-    "min_price"             : 10,      # 過濾低價股
+    "min_price"             : 15,      # 過濾低價股
     "min_volume_daily"      : 500,  # 最低日均量（張）
 }
 
