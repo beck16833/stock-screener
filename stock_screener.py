@@ -202,13 +202,19 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
     if consolidation_days >= CRITERIA["min_consolidation_days"]:
         score += 20; signals.append("型態")
 
-    # 4. 突破近20日高點
-    high20     = df["close"].iloc[-21:-1].max()
+   # 4. 突破偵測（近 20 日新高 + 過昨日最高點）
+    high20      = df["close"].iloc[-21:-1].max()
+    prev_high   = float(prev["high"])
     is_breakout = latest["close"] > high20
+    over_prev_high = latest["close"] > prev_high
+    details["breakout"]       = is_breakout
+    details["over_prev_high"] = over_prev_high
     if is_breakout:
         score += 15
         if "型態" not in signals:
             signals.append("型態")
+    if over_prev_high:
+        score += 10
 
     # 5. 動能
     if len(df) >= 6:
@@ -229,9 +235,9 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
         return None
 
     # 進場策略
-    if is_breakout and vol_ratio >= 2.0:
+    if is_breakout and vol_ratio >= 2.0 and over_prev_high:
         entry = "盤整突破"
-    elif ma_bull3 and vol_ratio < 1.2 and mom5 > 0:
+    elif ma_bull3 and vol_ratio < 1.2 and mom5 > 0 and over_prev_high:
         entry = "回後買上漲"
     else:
         entry = "觀察等待"
