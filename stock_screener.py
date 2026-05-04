@@ -306,7 +306,7 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
     result_score  = 0
     result_sigs   = []
 
-      if breakout_valid and score_b >= MIN_SCORE:
+    if breakout_valid and score_b >= MIN_SCORE:
         result_entry = "盤整突破"
         result_score = min(score_b, 100)
         result_sigs  = sigs_b
