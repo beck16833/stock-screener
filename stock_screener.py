@@ -111,12 +111,14 @@ def get_stock_universe() -> pd.DataFrame:
     try:
         r = requests.get(BASE_URL, params=params, timeout=20)
         data = r.json()
-        print("API 回傳狀態:", data.get("status"))
-        print("欄位:", pd.DataFrame(data.get("data", [])).columns.tolist() if data.get("data") else "無資料")
         if data.get("status") == 200 and data.get("data"):
             df = pd.DataFrame(data["data"])
-            # 只保留四碼純數字的普通股
+            log.info(f"原始欄位: {df.columns.tolist()}")
+            log.info(f"欄位範例: {df.iloc[0].to_dict()}")
+            # 只保留四碼純數字
             df = df[df["stock_id"].str.match(r'^\d{4}$', na=False)]
+            # 去除重複
+            df = df.drop_duplicates(subset=["stock_id"])
             log.info(f"共取得 {len(df)} 檔股票")
             return df
     except Exception as e:
