@@ -199,12 +199,12 @@ td{padding:12px 14px;white-space:nowrap}
   <div class="toggle-row">
     <span class="toggle-label">產業：</span>
     <button class="toggle-btn on" data-type="industry" data-val="" onclick="setFilter('industry','',this)">全部</button>
-    <button class="toggle-btn" data-type="industry" data-val="其他" onclick="toggleFilter(this)">其他</button>
+    <button class="toggle-btn" data-type="industry" data-val="電子零組件" onclick="toggleFilter(this)">電子零組件</button><button class="toggle-btn" data-type="industry" data-val="其他" onclick="toggleFilter(this)">其他</button>
   </div>
   <div class="toggle-row">
     <span class="toggle-label">市值：</span>
     <button class="toggle-btn on" data-type="cap" data-val="" onclick="setFilter('cap','',this)">全部</button>
-    <button class="toggle-btn" data-type="cap" data-val="小型股" onclick="toggleFilter(this)">小型股</button>
+    <button class="toggle-btn" data-type="cap" data-val="中型股" onclick="toggleFilter(this)">中型股</button><button class="toggle-btn" data-type="cap" data-val="小型股" onclick="toggleFilter(this)">小型股</button>
   </div>
   <div class="toggle-row">
     <span class="toggle-label">訊號：</span>
@@ -273,7 +273,7 @@ td{padding:12px 14px;white-space:nowrap}
 
 </main>
 <script>
-const ALL = [{"code": "6165", "price": 53.1, "chg": 1.72, "score": 90, "signals": ["趨勢", "籌碼", "型態", "動能"], "consolidation_days": 24, "vol_ratio": 4.92, "momentum_5d": 5.99, "entry": "盤整突破", "ma_bull4": true, "industry": "其他", "name": "浪凡", "cap_size": "小型股"}, {"code": "6165", "price": 53.1, "chg": 1.72, "score": 90, "signals": ["趨勢", "籌碼", "型態", "動能"], "consolidation_days": 24, "vol_ratio": 4.92, "momentum_5d": 5.99, "entry": "盤整突破", "ma_bull4": true, "industry": "其他", "name": "浪凡", "cap_size": "小型股"}, {"code": "6165", "price": 53.1, "chg": 1.72, "score": 90, "signals": ["趨勢", "籌碼", "型態", "動能"], "consolidation_days": 24, "vol_ratio": 4.92, "momentum_5d": 5.99, "entry": "盤整突破", "ma_bull4": true, "industry": "其他", "name": "浪凡", "cap_size": "小型股"}];
+const ALL = [{"code": "6757", "price": 50.9, "chg": 2.52, "score": 75, "signals": ["籌碼", "型態", "動能"], "consolidation_days": 21, "vol_ratio": 1.58, "momentum_5d": 6.82, "entry": "觀察等待", "ma_bull4": false, "industry": "其他", "name": "台灣虎航-創", "cap_size": "小型股"}, {"code": "8091", "price": 197.0, "chg": 2.6, "score": 70, "signals": ["趨勢", "型態", "動能"], "consolidation_days": 20, "vol_ratio": 1.14, "momentum_5d": 8.24, "entry": "回後買上漲", "ma_bull4": true, "industry": "電子零組件", "name": "翔名", "cap_size": "中型股"}, {"code": "4958", "price": 432.5, "chg": 2.73, "score": 70, "signals": ["趨勢", "籌碼", "型態", "動能"], "consolidation_days": 9, "vol_ratio": 1.57, "momentum_5d": 24.46, "entry": "觀察等待", "ma_bull4": true, "industry": "其他", "name": "臻鼎-KY", "cap_size": "中型股"}];
 let sKey='score', sDir=-1, actInd='', actCap='', actSigs=new Set();
 
 const sc = n => n>=90?'#38a169':n>=80?'#ca8a04':'#dc2626';
