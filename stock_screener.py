@@ -104,26 +104,22 @@ def fm_get(dataset: str, stock_id: str = "", start: str = "", end: str = "",
 def get_stock_universe() -> pd.DataFrame:
     """取得全市場股票清單（上市+上櫃）"""
     log.info("取得上市股票清單...")
-    params = {
-        "dataset": "TaiwanStockInfo",
-        "token"  : FINMIND_TOKEN,
-    }
-    try:
-        r = requests.get(BASE_URL, params=params, timeout=20)
-        data = r.json()
-        if data.get("status") == 200 and data.get("data"):
-            df = pd.DataFrame(data["data"])
-            log.info(f"原始欄位: {df.columns.tolist()}")
-            log.info(f"欄位範例: {df.iloc[0].to_dict()}")
-            # 只保留四碼純數字
-            df = df[df["stock_id"].str.match(r'^\d{4}$', na=False)]
-            # 去除重複
-            df = df.drop_duplicates(subset=["stock_id"])
-            log.info(f"共取得 {len(df)} 檔股票")
-            return df
-    except Exception as e:
-        log.error(f"取得清單失敗: {e}")
-    return pd.DataFrame()
+    listed = fm_get("TaiwanStockInfo")
+
+    if listed.empty:
+        log.error("無法取得股票清單")
+        return pd.DataFrame()
+
+    # 過濾：只保留普通股（排除 ETF、特別股、權證等）
+    if "type" in listed.columns:
+        listed = listed[listed["type"].isin(["twse", "tpex"])]
+
+    # 排除代號含字母的（權證、ETF等）
+    if "stock_id" in listed.columns:
+        listed = listed[listed["stock_id"].str.match(r'^\d{4}$', na=False)]
+
+    log.info(f"共取得 {len(listed)} 檔股票")
+    return listed
 
 
 def analyze_stock(stock_id: str, end_date: str) -> dict | None:
@@ -161,17 +157,13 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
     if vol_ma20 < CRITERIA["min_volume_daily"]:
         return None
 
-    # 均線
+    # 均線計算
     df["ma5"]  = df["close"].rolling(5).mean()
     df["ma10"] = df["close"].rolling(10).mean()
     df["ma20"] = df["close"].rolling(20).mean()
     df["ma60"] = df["close"].rolling(60).mean()
-
     latest = df.iloc[-1]
-    score   = 0
-    signals = []
 
-    # 1. 均線多頭排列
     try:
         ma_bull4 = (latest["ma5"] > latest["ma10"] > latest["ma20"] > latest["ma60"]
                     and latest["close"] > latest["ma5"])
@@ -180,17 +172,16 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
     except:
         return None
 
-    if ma_bull4:
-        score += 25; signals.append("趨勢")
-    elif ma_bull3:
-        score += 15; signals.append("趨勢")
+    # 共用指標
+    vol_ratio    = latest["volume"] / vol_ma20 if vol_ma20 > 0 else 0
+    high20       = df["close"].iloc[-21:-1].max()
+    prev_high    = float(prev["high"])
+    over_prev_h  = latest["close"] > prev_high
+    is_breakout  = latest["close"] > high20
+    body_pct     = (latest["close"] - latest["open"]) / latest["open"] * 100 if latest["open"] > 0 else 0
+    mom5         = (latest["close"] / df.iloc[-6]["close"] - 1) * 100 if len(df) >= 6 else 0
 
-    # 2. 爆量
-    vol_ratio = latest["volume"] / vol_ma20 if vol_ma20 > 0 else 0
-    if vol_ratio >= CRITERIA["min_volume_ratio"]:
-        score += 20; signals.append("籌碼")
-
-    # 3. 底部打底
+    # 底部打底天數
     recent60 = df["close"].iloc[-61:-1]
     base     = recent60.median()
     in_range = ((recent60 >= base * 0.92) & (recent60 <= base * 1.08))
@@ -199,48 +190,132 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
         run = run + 1 if v else 0
         max_run = max(max_run, run)
     consolidation_days = max_run
-    if consolidation_days >= CRITERIA["min_consolidation_days"]:
-        score += 20; signals.append("型態")
 
-   # 4. 突破偵測（近 20 日新高 + 過昨日最高點）
-    high20      = df["close"].iloc[-21:-1].max()
-    prev_high   = float(prev["high"])
-    is_breakout = latest["close"] > high20
-    over_prev_high = latest["close"] > prev_high
-    details["breakout"]       = is_breakout
-    details["over_prev_high"] = over_prev_high
+    # 回檔計算：從近20日高點回落幅度
+    recent20_high = df["high"].iloc[-21:-1].max()
+    pullback_pct  = (recent20_high - latest["close"]) / recent20_high * 100 if recent20_high > 0 else 0
+    # 支撐不破：收盤未跌破 20MA 且未跌破前波低點
+    recent10_low  = df["low"].iloc[-11:-1].min()
+    above_ma20    = latest["close"] > latest["ma20"]
+    support_hold  = above_ma20 and latest["close"] > recent10_low
+
+    # ═══════════════════════════════════════
+    #  系統一：盤整突破評分（滿分100）
+    # ═══════════════════════════════════════
+    score_b  = 0
+    sigs_b   = []
+
+    # 條件1：底部打底 ≥ 20天（地基紮實）—— 核心條件
+    if consolidation_days >= 20:
+        score_b += 30
+        sigs_b.append("型態")
+    elif consolidation_days >= 10:
+        score_b += 15
+        sigs_b.append("型態")
+
+    # 條件2：突破近20日高點 —— 核心條件
     if is_breakout:
-        score += 15
-        if "型態" not in signals:
-            signals.append("型態")
-    if over_prev_high:
-        score += 10
+        score_b += 25
+        if "型態" not in sigs_b:
+            sigs_b.append("型態")
 
-    # 5. 動能
-    if len(df) >= 6:
-        mom5 = (latest["close"] / df.iloc[-6]["close"] - 1) * 100
-    else:
-        mom5 = 0
+    # 條件3：過昨日最高點（確認突破有效）
+    if over_prev_h:
+        score_b += 15
+
+    # 條件4：爆量 ≥ 2x（主力進場）
+    if vol_ratio >= 2.0:
+        score_b += 20
+        sigs_b.append("籌碼")
+    elif vol_ratio >= 1.5:
+        score_b += 10
+        sigs_b.append("籌碼")
+
+    # 條件5：陽線實體 ≥ 1.5%
+    if body_pct >= 2.0:
+        score_b += 10
+    elif body_pct >= 1.5:
+        score_b += 5
+
+    # 條件6：均線多頭加分
+    if ma_bull4:
+        score_b += 10
+        sigs_b.append("趨勢")
+    elif ma_bull3:
+        score_b += 5
+        sigs_b.append("趨勢")
+
+    # 動能加分
     if mom5 >= 3:
-        score += 10; signals.append("動能")
-    elif mom5 >= 1:
-        score += 5
+        sigs_b.append("動能")
 
-    # 6. 陽線實體
-    body_pct = (latest["close"] - latest["open"]) / latest["open"] * 100 if latest["open"] > 0 else 0
-    if body_pct >= 1.5:
-        score += 10
+    # 盤整突破必要條件：底部打底 + 突破 + 過昨高，三者缺一不可
+    breakout_valid = (consolidation_days >= 20 and is_breakout and over_prev_h)
 
-    if score < CRITERIA["min_score"]:
-        return None
+    # ═══════════════════════════════════════
+    #  系統二：回後買上漲評分（滿分100）
+    # ═══════════════════════════════════════
+    score_p  = 0
+    sigs_p   = []
 
-    # 進場策略
-    if is_breakout and vol_ratio >= 2.0 and over_prev_high:
-        entry = "盤整突破"
-    elif ma_bull3 and vol_ratio < 1.2 and mom5 > 0 and over_prev_high:
-        entry = "回後買上漲"
+    # 條件1：均線多頭排列 —— 核心條件（趨勢必須健康）
+    if ma_bull4:
+        score_p += 30
+        sigs_p.append("趨勢")
+    elif ma_bull3:
+        score_p += 20
+        sigs_p.append("趨勢")
     else:
-        entry = "觀察等待"
+        score_p = 0  # 無趨勢直接不符合
+
+    # 條件2：支撐不破（收盤 > 20MA，未跌破前波低點）
+    if support_hold:
+        score_p += 25
+        sigs_p.append("型態")
+
+    # 條件3：過昨日最高點（確認反彈啟動）—— 核心條件
+    if over_prev_h:
+        score_p += 20
+
+    # 條件4：量縮回檔後今日放量（回檔量縮 + 今日量增）
+    vol_ma5_prev = df["volume"].iloc[-6:-1].mean()
+    vol_shrink   = vol_ma5_prev < vol_ma20 * 0.8   # 近5日均量 < 20日均量80%（量縮）
+    vol_expand   = latest["volume"] > vol_ma5_prev  # 今日量 > 近5日均量（量增）
+    if vol_shrink and vol_expand:
+        score_p += 15
+        sigs_p.append("籌碼")
+    elif vol_shrink:
+        score_p += 8
+
+    # 條件5：5日動能轉正
+    if mom5 >= 1:
+        score_p += 10
+        sigs_p.append("動能")
+    elif mom5 > 0:
+        score_p += 5
+
+    # 回後買上漲必要條件：有趨勢 + 支撐不破 + 過昨高
+    pullback_valid = (ma_bull3 and support_hold and over_prev_h)
+
+    # ═══════════════════════════════════════
+    #  決定最終結果
+    # ═══════════════════════════════════════
+    MIN_SCORE = CRITERIA["min_score"]  # 65
+
+    result_entry  = None
+    result_score  = 0
+    result_sigs   = []
+
+    if breakout_valid and score_b >= MIN_SCORE:
+        result_entry = "盤整突破"
+        result_score = min(score_b, 100)
+        result_sigs  = sigs_b
+    elif pullback_valid and score_p >= MIN_SCORE:
+        result_entry = "回後買上漲"
+        result_score = min(score_p, 100)
+        result_sigs  = sigs_p
+    else:
+        return None  # 兩種型態都不符合，直接排除
 
     chg = (latest["close"] / prev["close"] - 1) * 100 if prev["close"] > 0 else 0
 
@@ -248,13 +323,20 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
         "code"              : stock_id,
         "price"             : round(float(latest["close"]), 1),
         "chg"               : round(chg, 2),
-        "score"             : min(score, 100),
-        "signals"           : signals,
+        "score"             : result_score,
+        "signals"           : list(dict.fromkeys(result_sigs)),  # 去重保序
         "consolidation_days": int(consolidation_days),
         "vol_ratio"         : round(vol_ratio, 2),
         "momentum_5d"       : round(mom5, 2),
-        "entry"             : entry,
+        "entry"             : result_entry,
         "ma_bull4"          : bool(ma_bull4),
+        "details"           : {
+            "breakout"      : bool(is_breakout),
+            "over_prev_high": bool(over_prev_h),
+            "support_hold"  : bool(support_hold),
+            "pullback_pct"  : round(pullback_pct, 2),
+            "body_pct"      : round(body_pct, 2),
+        }
     }
 
 
