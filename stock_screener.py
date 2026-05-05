@@ -1,7 +1,8 @@
 """
-飆股雷達 v2 - 全市場掃描核心
+飆股雷達 v3 - 全市場掃描核心 + 動態題材偵測
 資料來源: FinMind
 支援: 上市 + 上櫃，約 1,700+ 檔
+四套獨立評分系統：盤整突破 / 回後買上漲 / 強勢上漲 / 題材熱股
 """
 
 import os
@@ -12,6 +13,7 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import Counter
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 log = logging.getLogger(__name__)
@@ -24,11 +26,11 @@ BASE_URL = "https://api.finmindtrade.com/api/v4/data"
 
 # ── 選股門檻 ────────────────────────────────────────────
 CRITERIA = {
-    "min_consolidation_days": 20,   # 打底天數（盤整突破必要條件）
-    "min_volume_ratio"      : 1.0,  # 最低爆量倍數（由評分系統決定加分）
-    "min_score"             : 65,   # 最低及格分
-    "min_price"             : 20,   # 最低股價（過濾低價股）
-    "min_volume_daily"      : 500,  # 最低日均量（張），500張 = 基本流動性
+    "min_consolidation_days": 20,
+    "min_volume_ratio"      : 1.0,
+    "min_score"             : 65,
+    "min_price"             : 20,
+    "min_volume_daily"      : 1000000,
 }
 
 # ── 產業分類對照表 ──────────────────────────────────────
@@ -122,7 +124,10 @@ def get_stock_universe() -> pd.DataFrame:
     return listed
 
 
-def analyze_stock(stock_id: str, end_date: str) -> dict | None:
+def analyze_stock(stock_id: str, end_date: str, hot_industries: set = None) -> dict | None:
+    if hot_industries is None:
+        hot_industries = set()
+    
     start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=200)).strftime("%Y-%m-%d")
 
     df = fm_get("TaiwanStockPrice", stock_id, start, end_date)
@@ -279,8 +284,8 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
 
     # 條件4：量縮回檔後今日放量（回檔量縮 + 今日量增）
     vol_ma5_prev = df["volume"].iloc[-6:-1].mean()
-    vol_shrink   = vol_ma5_prev < vol_ma20 * 0.8   # 近5日均量 < 20日均量80%（量縮）
-    vol_expand   = latest["volume"] > vol_ma5_prev  # 今日量 > 近5日均量（量增）
+    vol_shrink   = vol_ma5_prev < vol_ma20 * 0.8
+    vol_expand   = latest["volume"] > vol_ma5_prev
     if vol_shrink and vol_expand:
         score_p += 15
         sigs_p.append("籌碼")
@@ -298,9 +303,96 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
     pullback_valid = (ma_bull3 and support_hold and over_prev_h)
 
     # ═══════════════════════════════════════
+    #  系統三：強勢上漲評分（滿分100）
+    # ═══════════════════════════════════════
+    score_s  = 0
+    sigs_s   = []
+
+    # 條件1：近一月新高（強勢確認）—— 核心條件
+    high20_days = df["close"].iloc[-21:-1].max()
+    is_new_high = latest["close"] > high20_days
+    if is_new_high:
+        score_s += 35
+        sigs_s.append("型態")
+
+    # 條件2：均線多頭排列 —— 核心條件
+    if ma_bull4:
+        score_s += 30
+        sigs_s.append("趨勢")
+    elif ma_bull3:
+        score_s += 20
+        sigs_s.append("趨勢")
+    else:
+        score_s = 0
+
+    # 條件3：過昨日最高點（確認今日強勢）
+    if over_prev_h:
+        score_s += 15
+
+    # 條件4：爆量 ≥ 1.2x（主力參與）
+    if vol_ratio >= 1.5:
+        score_s += 20
+        sigs_s.append("籌碼")
+    elif vol_ratio >= 1.2:
+        score_s += 15
+        sigs_s.append("籌碼")
+
+    # 條件5：股價創新高且量能配合
+    if is_new_high and vol_ratio >= 1.2:
+        score_s += 10
+
+    # 條件6：5日動能轉正
+    if mom5 >= 1:
+        score_s += 10
+        sigs_s.append("動能")
+    elif mom5 > 0:
+        score_s += 5
+
+    # 強勢大型股必要條件：創新高 + 有趨勢 + 過昨高
+    strong_valid = (is_new_high and ma_bull3 and over_prev_h)
+
+    # ═══════════════════════════════════════
+    #  系統四：題材熱股評分（滿分100）
+    # ═══════════════════════════════════════
+    score_t  = 0
+    sigs_t   = []
+
+    # 由 run_screener 傳入當日熱門產業
+    # 條件1：符合熱門題材 —— 核心條件
+    if hot_industries:
+        score_t += 40
+        sigs_t.append("題材")
+    
+    # 條件2：三線多排 —— 核心條件
+    if ma_bull3:
+        score_t += 25
+        sigs_t.append("趨勢")
+    else:
+        score_t = 0
+
+    # 條件3：爆量 ≥ 1.2x（題材個股需要量能確認）
+    if vol_ratio >= 1.2:
+        score_t += 20
+        sigs_t.append("籌碼")
+
+    # 條件4：過昨日最高點（短期強勢）
+    if over_prev_h:
+        score_t += 10
+
+    # 條件5：5日動能轉正
+    if mom5 >= 1:
+        score_t += 10
+        sigs_t.append("動能")
+    elif mom5 > 0:
+        score_t += 5
+
+    # 題材熱股必要條件：符合熱門題材 + 三線多排 + 爆量≥1.2x
+    theme_valid = (hot_industries and ma_bull3 and vol_ratio >= 1.2)
+
+    # ═══════════════════════════════════════
     #  決定最終結果
     # ═══════════════════════════════════════
-    MIN_SCORE = CRITERIA["min_score"]  # 65
+    MIN_SCORE = CRITERIA["min_score"]
 
     result_entry  = None
     result_score  = 0
@@ -314,8 +406,16 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
         result_entry = "回後買上漲"
         result_score = min(score_p, 100)
         result_sigs  = sigs_p
+    elif strong_valid and score_s >= 60:
+        result_entry = "強勢上漲"
+        result_score = min(score_s, 100)
+        result_sigs  = sigs_s
+    elif theme_valid and score_t >= 55:
+        result_entry = "題材熱股"
+        result_score = min(score_t, 100)
+        result_sigs  = sigs_t
     else:
-        return None  # 兩種型態都不符合，直接排除
+        return None
 
     chg = (latest["close"] / prev["close"] - 1) * 100 if prev["close"] > 0 else 0
 
@@ -324,7 +424,7 @@ def analyze_stock(stock_id: str, end_date: str) -> dict | None:
         "price"             : round(float(latest["close"]), 1),
         "chg"               : round(chg, 2),
         "score"             : result_score,
-        "signals"           : list(dict.fromkeys(result_sigs)),  # 去重保序
+        "signals"           : list(dict.fromkeys(result_sigs)),
         "consolidation_days": int(consolidation_days),
         "vol_ratio"         : round(vol_ratio, 2),
         "momentum_5d"       : round(mom5, 2),
@@ -361,14 +461,23 @@ def run_screener(date: str = None, max_workers: int = 3) -> list[dict]:
             industry_lookup[sid] = classify_industry(str(row.get("industry_category", "")))
             name_lookup[sid]     = str(row.get("stock_name", sid))
 
+    # 動態偵測熱門產業：統計每個產業在全市場的股票數
+    industry_count = Counter(industry_lookup.values())
+    
+    # 取出現股數最多的前 3 個產業作為當日熱門題材
+    hot_industries = set([ind for ind, cnt in industry_count.most_common(3)])
+    log.info(f"當日熱門產業: {', '.join([f'{ind}({industry_count[ind]}檔)' for ind in sorted(hot_industries, key=lambda x: industry_count[x], reverse=True)])}")
+
     log.info(f"開始掃描 {len(stock_ids)} 檔，基準日: {date}")
     results  = []
     total    = len(stock_ids)
     done     = 0
 
-    # 使用 ThreadPoolExecutor 加速（但控制並發數避免被限速）
+    # 使用 ThreadPoolExecutor 加速
     def worker(sid):
-        result = analyze_stock(sid, date)
+        # 判斷該股票是否屬於熱門產業
+        stock_hot_industries = {industry_lookup.get(sid, "")} if industry_lookup.get(sid, "") in hot_industries else set()
+        result = analyze_stock(sid, date, stock_hot_industries)
         time.sleep(0.3)
         return sid, result
 
