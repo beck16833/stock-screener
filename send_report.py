@@ -390,7 +390,7 @@ function render(){{
     const chgStr=(s.chg>=0?'+':'')+s.chg+'%';
     const sigs=s.signals.map(sig=>`<span class="sig sig-${{sig}}">${{sig}}</span>`).join('');
     return `<tr>
-      <td><a class="stock-link" href="https://www.wantgoo.com/stock/${{s.code}}" target="_blank">
+      <a class="stock-link" href="https://www.wantgoo.com/stock/{s['code']}/chart" target="_blank">
         <div class="stock-code">${{s.code}}</div><div class="stock-name">${{s.name}}</div>
       </a></td>
       <td><span class="price ${{s.chg>=0?'up':'down'}}">${{s.price.toLocaleString()}}</span></td>
