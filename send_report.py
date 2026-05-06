@@ -381,8 +381,13 @@ function render(){{
 
 function toggleSig(btn){{
   const sig=btn.dataset.sig;
-  if(actSigs.has(sig)){{actSigs.delete(sig);btn.classList.remove('on');}}
-  else{{actSigs.add(sig);btn.classList.add('on');}}
+  if(actSigs.has(sig)){{
+    actSigs.delete(sig);
+    btn.classList.remove('on');
+  }}else{{
+    actSigs.add(sig);
+    btn.classList.add('on');
+  }}
   render();
 }}
 
