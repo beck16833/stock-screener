@@ -30,7 +30,7 @@ CRITERIA = {
     "min_volume_ratio"      : 1.0,
     "min_score"             : 65,
     "min_price"             : 20,
-    "min_volume_daily"      : 1000000,
+    "min_volume_daily"      : 500000,
 }
 
 # ── 產業分類對照表 ──────────────────────────────────────
@@ -481,18 +481,18 @@ def run_screener(date: str = None, max_workers: int = 3) -> list[dict]:
         time.sleep(0.3)
         return sid, result
 
-with ThreadPoolExecutor(max_workers=max_workers) as executor:
-    futures = {executor.submit(worker, sid): sid for sid in stock_ids}
-    seen_codes = set()  # 新增：記錄已加入的股票代號
-    for future in as_completed(futures):
-        done += 1
-        sid, result = future.result()
-        if result and sid not in seen_codes:  # 修改：檢查是否已存在
-            seen_codes.add(sid)  # 新增：標記為已加入
-            result["industry"] = industry_lookup.get(sid, "其他")
-            result["name"]     = name_lookup.get(sid, sid)
-            result["cap_size"] = classify_market_cap(result["price"])
-            results.append(result)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(worker, sid): sid for sid in stock_ids}
+        seen_codes = set()
+        for future in as_completed(futures):
+            done += 1
+            sid, result = future.result()
+            if result and sid not in seen_codes:
+                seen_codes.add(sid)
+                result["industry"] = industry_lookup.get(sid, "其他")
+                result["name"]     = name_lookup.get(sid, sid)
+                result["cap_size"] = classify_market_cap(result["price"])
+                results.append(result)
             if done % 50 == 0 or done == total:
                 log.info(f"進度: {done}/{total}，目前找到 {len(results)} 檔")
 
