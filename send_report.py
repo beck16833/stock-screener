@@ -344,7 +344,26 @@ function getFiltered(){{
     if(ef&&s.entry!==ef)return false;
     if(inf&&s.industry!==inf)return false;
     if(cf&&s.cap_size!==cf)return false;
-    if(actSigs.size>0&&![...actSigs].some(sig=>s.signals.includes(sig)))return false;
+    function getFiltered(){{
+  const ms=+document.getElementById('f-score').value||0;
+  const ef=document.getElementById('f-entry').value;
+  const inf=document.getElementById('f-ind').value;
+  const cf=document.getElementById('f-cap').value;
+  return ALL.filter(s=>{{
+    if(s.score<ms)return false;
+    if(ef&&s.entry!==ef)return false;
+    if(inf&&s.industry!==inf)return false;
+    if(cf&&s.cap_size!==cf)return false;
+    if(actSigs.size>0){{
+      const hasSignal=[...actSigs].some(sig=>s.signals.includes(sig));
+      if(!hasSignal)return false;
+    }}
+    return true;
+  }}).sort((a,b)=>{{
+    const va=a[sKey],vb=b[sKey];
+    return(typeof va==='number'?(va-vb):(String(va).localeCompare(String(vb))))*sDir;
+  }});
+}}
     return true;
   }}).sort((a,b)=>{{
     const va=a[sKey],vb=b[sKey];
