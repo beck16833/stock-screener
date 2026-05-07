@@ -166,27 +166,59 @@ function showBreakoutParams() {{
   section.classList.toggle('show', entry === '盤整突破');
 }}
 
-function getFiltered() {{
-  const ms = +document.getElementById('f-score').value||0;
+function getFiltered() {
+  const ms = +document.getElementById('f-score').value || 0;
   const ef = document.getElementById('f-entry').value;
   const inf = document.getElementById('f-ind').value;
   const cf = document.getElementById('f-cap').value;
   
-  return ALL.filter(s => {{
-    if(s.score < ms) return false;
-    if(ef && s.entry !== ef) return false;
-    if(inf && s.industry !== inf) return false;
-    if(cf && s.cap_size !== cf) return false;
-    if(actSigs.size > 0) {{
+  // --- 獲取盤整突破參數 ---
+  const pHighReq = +document.getElementById('p-high-days').value || 20;
+  const pVol5dReq = +document.getElementById('p-vol-5d').value || 1.5;
+  const pShadowMax = +document.getElementById('p-upper-shadow').value || 2;
+  const pVolPrevReq = +document.getElementById('p-vol-prev').value || 1.2;
+
+  return ALL.filter(s => {
+    // 1. 基礎篩選 (評分、產業、市值)
+    if (s.score < ms) return false;
+    if (inf && s.industry !== inf) return false;
+    if (cf && s.cap_size !== cf) return false;
+    
+    // 2. 進場策略過濾
+    if (ef) {
+      if (s.entry !== ef) return false;
+      
+      // 如果策略選的是「盤整突破」，則套用面板上的動態參數
+      if (ef === '盤整突破') {
+        // A. 5日均量倍數 (volume / vol_ma5)
+        const v5r = s.vol_ma5 > 0 ? (s.volume / s.vol_ma5) : 0;
+        if (v5r < pVol5dReq) return false;
+        
+        // B. 上影線限制 (已在 Python 算好為 upper_shadow_pct)
+        if (s.upper_shadow_pct > pShadowMax) return false;
+        
+        // C. 昨日量倍數 (volume / prev_vol)
+        const vpr = s.prev_vol > 0 ? (s.volume / s.prev_vol) : 0;
+        if (vpr < pVolPrevReq) return false;
+        
+        // D. 打底天數 (s.consolidation_days 是否大於設定天數)
+        // 註：這裏對應你面板上的「近N日新高」，通常也是打底天數的參考
+        if (s.consolidation_days < pHighReq) return false;
+      }
+    }
+
+    // 3. 訊號過濾 (需包含勾選的所有訊號)
+    if (actSigs.size > 0) {
       const hasAll = [...actSigs].every(sig => s.signals.includes(sig));
-      if(!hasAll) return false;
-    }}
+      if (!hasAll) return false;
+    }
+    
     return true;
-  }}).sort((a,b) => {{
+  }).sort((a, b) => {
     const va = a[sKey], vb = b[sKey];
-    return (typeof va === 'number' ? va-vb : String(va).localeCompare(String(vb))) * sDir;
-  }});
-}}
+    return (typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb))) * sDir;
+  });
+}
 
 function render() {{
   const data = getFiltered();
@@ -201,8 +233,33 @@ function render() {{
     const chgClass = s.chg>=0 ? 'up' : 'down';
     const sigs = s.signals.map(sig => `<span class="sig sig-${{sig}}">${{sig}}</span>`).join('');
     const url = `https://www.wantgoo.com/stock/${{s.code}}/technical-chart`;
-    const vol_ratio_5d = s.vol_ma5 > 0 ? (s.volume / s.vol_ma5).toFixed(2) : 'N/A';
-    const vol_ratio_prev = s.prev_vol > 0 ? (s.volume / s.prev_vol).toFixed(2) : 'N/A';
+   // 取得目前面板上設定的門檻值，用來決定表格文字要顯示綠色(ok)還是紅色(ng)
+const pVol5dThreshold = +document.getElementById('p-vol-5d').value || 1.5;
+const pVolPrevThreshold = +document.getElementById('p-vol-prev').value || 1.2;
+const pShadowThreshold = +document.getElementById('p-upper-shadow').value || 2.0;
+
+return `<tr>
+  <td><a class="stock-link" href="${url}" target="_blank">${s.code}</a></td>
+  <td>${s.name}</td>
+  <td>${s.prev_close || '-'}</td>
+  <td>${s.prev_vol ? s.prev_vol.toLocaleString() : '-'}</td>
+  <td><strong>${s.price}</strong></td>
+  <td>${s.volume.toLocaleString()}</td>
+  <td>${s.avg_price_5d || '-'}</td>
+  <td class="${chgClass}">${chgStr}</td>
+  
+  <td class="${s.upper_shadow_pct <= pShadowThreshold ? 'ok' : 'ng'}">${s.upper_shadow_pct.toFixed(2)}%</td>
+  
+  <td class="${vol_ratio_5d >= pVol5dThreshold ? 'ok' : 'ng'}">${vol_ratio_5d}</td>
+  
+  <td class="${vol_ratio_prev >= pVolPrevThreshold ? 'ok' : 'ng'}">${vol_ratio_prev}</td>
+  
+  <td><strong>${s.score}</strong></td>
+  <td>${sigs}</td>
+  <td>${s.industry}</td>
+  <td>${s.cap_size}</td>
+  <td>${s.entry}</td>
+</tr>`;
     return `<tr>
       <td><a class="stock-link" href="${{url}}" target="_blank">${{s.code}}</a></td>
       <td>${{s.name}}</td>
