@@ -459,7 +459,7 @@ def run_screener(date: str = None, max_workers: int = 3) -> list[dict]:
         for _, row in universe.iterrows():
             sid = row["stock_id"]
             industry_lookup[sid] = classify_industry(str(row.get("industry_category", "")))
-            name_lookup[sid]     = str(row.get("stock_name", sid))
+            name_lookup[sid] = str(row.get("name", row.get("stock_name", sid)))
 
     # 動態偵測熱門產業：統計每個產業在全市場的股票數
     industry_count = Counter(industry_lookup.values())
