@@ -220,24 +220,57 @@ function getFiltered() {
   });
 }
 
-function render() {{
+function render() {
   const data = getFiltered();
   document.getElementById('cnt').textContent = data.length;
   const tbody = document.getElementById('tbody');
-  if(!data.length) {{
+  
+  if(!data.length) {
     tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:48px;color:var(--muted)">無符合條件</td></tr>';
     return;
-  }}
-  tbody.innerHTML = data.map(s => {{
-    const chgStr = (s.chg>=0?'+':'') + s.chg + '%';
-    const chgClass = s.chg>=0 ? 'up' : 'down';
-    const sigs = s.signals.map(sig => `<span class="sig sig-${{sig}}">${{sig}}</span>`).join('');
-    const url = `https://www.wantgoo.com/stock/${{s.code}}/technical-chart`;
-   // 取得目前面板上設定的門檻值，用來決定表格文字要顯示綠色(ok)還是紅色(ng)
-const pVol5dThreshold = +document.getElementById('p-vol-5d').value || 1.5;
-const pVolPrevThreshold = +document.getElementById('p-vol-prev').value || 1.2;
-const pShadowThreshold = +document.getElementById('p-upper-shadow').value || 2.0;
+  }
 
+  tbody.innerHTML = data.map(s => {
+    const chgStr = (s.chg >= 0 ? '+' : '') + s.chg + '%';
+    const chgClass = s.chg >= 0 ? 'up' : 'down';
+    const sigs = s.signals.map(sig => `<span class="sig sig-${sig}">${sig}</span>`).join('');
+    const url = `https://www.wantgoo.com/stock/${s.code}/technical-chart`;
+    
+    // 計算即時比例
+    const vol_ratio_5d = s.vol_ma5 > 0 ? (s.volume / s.vol_ma5).toFixed(2) : 'N/A';
+    const vol_ratio_prev = s.prev_vol > 0 ? (s.volume / s.prev_vol).toFixed(2) : 'N/A';
+
+    // --- 這裡開始貼上你提供的新區塊 ---
+    // 取得目前面板上設定的門檻值
+    const pVol5dThreshold = +document.getElementById('p-vol-5d').value || 1.5;
+    const pVolPrevThreshold = +document.getElementById('p-vol-prev').value || 1.2;
+    const pShadowThreshold = +document.getElementById('p-upper-shadow').value || 2.0;
+
+    return `<tr>
+      <td><a class="stock-link" href="${url}" target="_blank">${s.code}</a></td>
+      <td>${s.name}</td>
+      <td>${s.prev_close || '-'}</td>
+      <td>${s.prev_vol ? s.prev_vol.toLocaleString() : '-'}</td>
+      <td><strong>${s.price}</strong></td>
+      <td>${s.volume.toLocaleString()}</td>
+      <td>${s.avg_price_5d || '-'}</td>
+      <td class="${chgClass}">${chgStr}</td>
+      
+      <td class="${s.upper_shadow_pct <= pShadowThreshold ? 'ok' : 'ng'}">${s.upper_shadow_pct.toFixed(2)}%</td>
+      
+      <td class="${vol_ratio_5d >= pVol5dThreshold ? 'ok' : 'ng'}">${vol_ratio_5d}</td>
+      
+      <td class="${vol_ratio_prev >= pVolPrevThreshold ? 'ok' : 'ng'}">${vol_ratio_prev}</td>
+      
+      <td><strong>${s.score}</strong></td>
+      <td>${sigs}</td>
+      <td>${s.industry}</td>
+      <td>${s.cap_size}</td>
+      <td>${s.entry}</td>
+    </tr>`;
+    // --- 新區塊結束 ---
+  }).join('');
+}
 return `<tr>
   <td><a class="stock-link" href="${url}" target="_blank">${s.code}</a></td>
   <td>${s.name}</td>
