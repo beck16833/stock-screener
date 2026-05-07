@@ -107,6 +107,16 @@ td{{padding:12px;border-bottom:1px solid rgba(34,40,48,.6)}}
       <label style="font-size:11px;color:var(--muted)">最低評分</label>
       <input class="f-input" type="number" id="f-score" value="55" min="0" max="100" onchange="render()">
     </div>
+    <div>
+      <label style="font-size:11px;color:var(--muted)">爆量門檻</label>
+      <select class="f-select" id="f-vol" onchange="render()">
+        <option value="0">不限</option>
+        <option value="1.0">≥ 1.0x</option>
+        <option value="1.2" selected>≥ 1.2x</option>
+        <option value="1.5">≥ 1.5x</option>
+        <option value="2.0">≥ 2.0x</option>
+      </select>
+    </div>
   </div>
   <div class="toggle-row">
     <span style="font-size:11px;color:var(--muted)">訊號篩選：</span>
@@ -148,12 +158,14 @@ function getFiltered() {{
   const ef = document.getElementById('f-entry').value;
   const inf = document.getElementById('f-ind').value;
   const cf = document.getElementById('f-cap').value;
+  const vol_threshold = +document.getElementById('f-vol').value||0;
   
   return ALL.filter(s => {{
     if(s.score < ms) return false;
     if(ef && s.entry !== ef) return false;
     if(inf && s.industry !== inf) return false;
     if(cf && s.cap_size !== cf) return false;
+    if(vol_threshold > 0 && s.vol_ratio < vol_threshold) return false;
     if(actSigs.size > 0) {{
       const hasAll = [...actSigs].every(sig => s.signals.includes(sig));
       if(!hasAll) return false;
