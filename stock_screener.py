@@ -1,370 +1,512 @@
-"""飆股雷達 HTML報告生成"""
-import os, json, smtplib, logging
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from datetime import datetime
-from stock_screener import run_screener, INDUSTRY_MAP
+"""
+飆股雷達 v3 - 全市場掃描核心 + 動態題材偵測
+資料來源: FinMind
+支援: 上市 + 上櫃，約 1,700+ 檔
+四套獨立評分系統：盤整突破 / 回後買上漲 / 強勢上漲 / 題材熱股
+"""
+
+import os
+import json
+import time
+import logging
+import requests
+import pandas as pd
+from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import Counter
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 log = logging.getLogger(__name__)
 
-EMAIL_CONFIG = {
-    "sender": os.getenv("EMAIL_SENDER", ""),
-    "password": os.getenv("EMAIL_PASSWORD", ""),
-    "receiver": os.getenv("EMAIL_RECEIVER", ""),
-    "smtp": "smtp.gmail.com",
-    "port": 587,
-}
-
-OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+FINMIND_TOKEN = os.getenv("FINMIND_TOKEN", "")
+OUTPUT_DIR    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def build_html(candidates, date):
-    weekday = ["一","二","三","四","五","六","日"][datetime.strptime(date, "%Y-%m-%d").weekday()]
-    data_json = json.dumps(candidates, ensure_ascii=False)
+BASE_URL = "https://api.finmindtrade.com/api/v4/data"
+
+# ── 選股門檻 ────────────────────────────────────────────
+CRITERIA = {
+    "min_consolidation_days": 20,
+    "min_volume_ratio"      : 1.0,
+    "min_score"             : 65,
+    "min_price"             : 20,
+    "min_volume_daily"      : 500000,
+}
+
+# ── 產業分類對照表 ──────────────────────────────────────
+INDUSTRY_MAP = {
+    "半導體": ["半導體", "積體電路", "晶圓", "IC設計", "封測"],
+    "電子零組件": ["電子零組件", "被動元件", "連接器", "印刷電路板", "PCB"],
+    "電腦及周邊": ["電腦及周邊", "伺服器", "筆記型電腦", "儲存"],
+    "通訊網路": ["通訊網路", "網路", "電信", "5G", "光纖"],
+    "光電": ["光電", "LED", "面板", "顯示器"],
+    "金融保險": ["金融", "銀行", "保險", "證券", "金控"],
+    "生技醫療": ["生技", "醫療", "製藥", "醫材", "健康"],
+    "電機機械": ["電機", "機械", "自動化", "馬達"],
+    "鋼鐵金屬": ["鋼鐵", "金屬", "鋁", "銅"],
+    "塑膠化工": ["塑膠", "化工", "石化", "橡膠"],
+    "食品": ["食品", "飲料", "農業"],
+    "紡織": ["紡織", "成衣"],
+    "建材營造": ["建材", "營造", "水泥", "玻璃"],
+    "航運": ["航運", "海運", "空運", "貨運"],
+    "觀光休閒": ["觀光", "休閒", "飯店", "旅遊"],
+    "其他": [],
+}
+
+def classify_industry(industry_str: str) -> str:
+    if not industry_str:
+        return "其他"
+    for group, keywords in INDUSTRY_MAP.items():
+        if group == "其他":
+            continue
+        if any(kw in industry_str for kw in keywords):
+            return group
+        if group in industry_str:
+            return group
+    return "其他"
+
+def classify_market_cap(close: float, shares: float = None) -> str:
+    """依股價簡易分類（無股本資料時用股價代替）"""
+    if close >= 500:
+        return "大型股"
+    elif close >= 100:
+        return "中型股"
+    elif close >= 30:
+        return "小型股"
+    else:
+        return "微型股"
+
+# ── FinMind API ─────────────────────────────────────────
+def fm_get(dataset: str, stock_id: str = "", start: str = "", end: str = "",
+           extra: dict = None) -> pd.DataFrame:
+    params = {
+        "dataset"   : dataset,
+        "token"     : FINMIND_TOKEN,
+    }
+    if stock_id: params["data_id"]    = stock_id
+    if start:    params["start_date"] = start
+    if end:      params["end_date"]   = end
+    if extra:    params.update(extra)
+
+    for attempt in range(3):
+        try:
+            r = requests.get(BASE_URL, params=params, timeout=20)
+            r.raise_for_status()
+            data = r.json()
+            if data.get("status") == 200 and data.get("data"):
+                return pd.DataFrame(data["data"])
+            return pd.DataFrame()
+        except Exception as e:
+            if attempt == 2:
+                log.debug(f"[FinMind] {stock_id} {dataset} 失敗: {e}")
+            time.sleep(1)
+    return pd.DataFrame()
+
+
+def get_stock_universe() -> pd.DataFrame:
+    """取得全市場股票清單（上市+上櫃）"""
+    log.info("取得上市股票清單...")
+    listed = fm_get("TaiwanStockInfo")
+
+    if listed.empty:
+        log.error("無法取得股票清單")
+        return pd.DataFrame()
+
+    # 過濾：只保留普通股（排除 ETF、特別股、權證等）
+    if "type" in listed.columns:
+        listed = listed[listed["type"].isin(["twse", "tpex"])]
+
+    # 排除代號含字母的（權證、ETF等）
+    if "stock_id" in listed.columns:
+        listed = listed[listed["stock_id"].str.match(r'^\d{4}$', na=False)]
+
+    log.info(f"共取得 {len(listed)} 檔股票")
+    return listed
+
+
+def analyze_stock(stock_id: str, end_date: str, hot_industries: set = None) -> dict | None:
+    if hot_industries is None:
+        hot_industries = set()
     
-    industries = sorted(set(s["industry"] for s in candidates),
-        key=lambda x: list(INDUSTRY_MAP.keys()).index(x) if x in INDUSTRY_MAP else 99)
-    
-    ind_options = "".join(f'<option value="{i}">{i}</option>' for i in industries)
-    
-    html = f"""<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 {date}</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-:root{{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}}
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{background:var(--bg);color:var(--text);font-family:'Noto Sans TC',sans-serif;}}
-header{{border-bottom:1px solid var(--border);padding:20px 32px;position:sticky;top:0;background:rgba(10,12,15,.95);z-index:50}}
-.logo{{font-size:20px;font-weight:900;color:var(--accent)}}
-main{{max-width:1600px;margin:0 auto;padding:32px}}
-.sec-title{{font-size:11px;color:var(--muted);margin-bottom:16px}}
-.filter-panel{{background:var(--surface);border:1px solid var(--border);padding:24px;margin-bottom:32px}}
-.filters-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-bottom:20px}}
-.filter-group{{display:flex;flex-direction:column;gap:8px}}
-.f-select,.f-input{{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px;width:100%}}
-.breakout-params{{display:none;background:rgba(240,180,41,.05);border:1px solid rgba(240,180,41,.2);border-radius:4px;padding:16px;margin-top:16px}}
-.breakout-params.show{{display:block}}
-.params-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}}
-.toggle-row{{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}}
-.toggle-btn{{padding:6px 12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}}
-.toggle-btn.on{{background:rgba(240,180,41,.12);border-color:var(--accent);color:var(--accent)}}
-.run-btn{{width:100%;padding:14px;margin-top:20px;background:var(--accent);color:#0a0c0f;font-weight:700;border:none;cursor:pointer}}
-.table-wrap{{background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow-x:auto}}
-table{{width:100%;border-collapse:collapse;font-size:12px}}
-th{{padding:10px;text-align:left;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer}}
-td{{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}}
-.stock-link{{text-decoration:none;color:#63b3ed}}
-.stock-link:hover{{text-decoration:underline}}
-.sig{{display:inline-block;padding:2px 6px;font-size:10px;border-radius:2px;margin:1px}}
-.sig-型態{{background:#dbeafe;color:#1d4ed8}}
-.sig-籌碼{{background:#fef9c3;color:#92400e}}
-.sig-趨勢{{background:#dcfce7;color:#15803d}}
-.sig-動能{{background:#f3e8ff;color:#7e22ce}}
-.sig-題材{{background:#fee2e2;color:#b91c1c}}
-.ok{{color:#68d391;font-weight:600}}.ng{{color:#fc8181;font-weight:600}}
-.up{{color:#fc8181}}.down{{color:#68d391}}
-</style>
-</head>
-<body>
-<header>
-  <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">{date}（週{weekday}） • {len(candidates)} 檔</div>
-</header>
-<main>
-<div class="sec-title">篩選條件</div>
-<div class="filter-panel">
-  <div class="filters-grid">
-    <div>
-      <label style="font-size:11px;color:var(--muted)">進場策略</label>
-      <select class="f-select" id="f-entry" onchange="toggleBreakoutParams(); render()">
-        <option value="">全部</option>
-        <option value="盤整突破">盤整突破</option>
-        <option value="回後買上漲">回後買上漲</option>
-        <option value="強勢上漲">強勢上漲</option>
-        <option value="題材熱股">題材熱股</option>
-      </select>
-    </div>
-    <div>
-      <label style="font-size:11px;color:var(--muted)">產業別</label>
-      <select class="f-select" id="f-ind" onchange="render()">
-        <option value="">全部</option>
-        {ind_options}
-      </select>
-    </div>
-    <div>
-      <label style="font-size:11px;color:var(--muted)">市值規模</label>
-      <select class="f-select" id="f-cap" onchange="render()">
-        <option value="">全部</option>
-        <option value="大型股">大型股</option>
-        <option value="中型股">中型股</option>
-        <option value="小型股">小型股</option>
-        <option value="微型股">微型股</option>
-      </select>
-    </div>
-    <div>
-      <label style="font-size:11px;color:var(--muted)">最低評分</label>
-      <input class="f-input" type="number" id="f-score" value="55" min="0" max="100" onchange="render()">
-    </div>
-  </div>
-  
-  <div id="breakoutParams" class="breakout-params">
-    <div style="font-size:12px;font-weight:700;margin-bottom:12px;color:var(--accent)">盤整突破參數設定</div>
-    <div class="params-grid">
-      <div>
-        <label style="font-size:11px;color:var(--muted)">近N日新高</label>
-        <input class="f-input" type="number" id="p-high-days" value="20" min="5" max="60" onchange="render()">
-      </div>
-      <div>
-        <label style="font-size:11px;color:var(--muted)">5日均量倍數</label>
-        <input class="f-input" type="number" id="p-vol-5d" value="1.5" min="0.5" max="5" step="0.1" onchange="render()">
-      </div>
-      <div>
-        <label style="font-size:11px;color:var(--muted)">上影線上限%</label>
-        <input class="f-input" type="number" id="p-upper-shadow" value="2" min="0" max="10" step="0.5" onchange="render()">
-      </div>
-      <div>
-        <label style="font-size:11px;color:var(--muted)">昨日量倍數</label>
-        <input class="f-input" type="number" id="p-vol-prev" value="1.2" min="0.5" max="5" step="0.1" onchange="render()">
-      </div>
-    </div>
-  </div>
-  
-  <div class="toggle-row">
-    <span style="font-size:11px;color:var(--muted)">訊號篩選：</span>
-    <button class="toggle-btn" data-sig="型態" onclick="toggleSig(this)">型態</button>
-    <button class="toggle-btn" data-sig="籌碼" onclick="toggleSig(this)">籌碼</button>
-    <button class="toggle-btn" data-sig="趨勢" onclick="toggleSig(this)">趨勢</button>
-    <button class="toggle-btn" data-sig="動能" onclick="toggleSig(this)">動能</button>
-    <button class="toggle-btn" data-sig="題材" onclick="toggleSig(this)">題材</button>
-  </div>
-  <button class="run-btn" onclick="render()">🔍 套用篩選</button>
-</div>
+    start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=200)).strftime("%Y-%m-%d")
 
-<div style="margin-bottom:16px">
-  <span style="font-size:13px">找到 <span id="cnt" style="color:var(--accent);font-weight:700">-</span> 檔候選</span>
-</div>
-<div class="table-wrap">
-  <table>
-    <thead><tr style="background:var(--surface2)">
-      <th onclick="sortBy('code',this)" style="cursor:pointer">代號</th>
-      <th>名稱</th>
-      <th onclick="sortBy('prev_close',this)" style="cursor:pointer">昨日收盤</th>
-      <th onclick="sortBy('prev_vol',this)" style="cursor:pointer">昨日量</th>
-      <th onclick="sortBy('price',this)" style="cursor:pointer">今日收盤</th>
-      <th onclick="sortBy('volume',this)" style="cursor:pointer">今日量</th>
-      <th>5日均價</th>
-      <th>漲跌%</th>
-      <th>上影線%</th>
-      <th>量比(vs5日)</th>
-      <th>量比(vsYesterday)</th>
-      <th onclick="sortBy('score',this)" style="cursor:pointer">評分</th>
-      <th>訊號</th>
-      <th>產業</th>
-      <th>市值</th>
-      <th>策略</th>
-    </tr></thead>
-    <tbody id="tbody"></tbody>
-  </table>
-</div>
-</main>
+    df = fm_get("TaiwanStockPrice", stock_id, start, end_date)
+    if df.empty or len(df) < 65:
+        return None
 
-<script>
-const ALL = {data_json};
-let sKey='score', sDir=-1, actSigs=new Set();
+    # 欄位標準化
+    df = df.rename(columns={
+        "Trading_Volume": "volume",
+        "max": "high",
+        "min": "low",
+    })
 
-function toggleBreakoutParams() {{
-  const entry = document.getElementById('f-entry').value;
-  const panel = document.getElementById('breakoutParams');
-  if(entry === '盤整突破') {{
-    panel.classList.add('show');
-  }} else {{
-    panel.classList.remove('show');
-  }}
-}}
+    df = df.sort_values("date").reset_index(drop=True)
+    for col in ["close", "open", "high", "low", "volume"]:
+        if col not in df.columns:
+            return None
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
-function getFiltered() {{
-  const ms = +document.getElementById('f-score').value||0;
-  const ef = document.getElementById('f-entry').value;
-  const inf = document.getElementById('f-ind').value;
-  const cf = document.getElementById('f-cap').value;
-  
-  // 盤整突破參數
-  const highDays = +document.getElementById('p-high-days').value||20;
-  const vol5d = +document.getElementById('p-vol-5d').value||1.5;
-  const upperShadow = +document.getElementById('p-upper-shadow').value||2;
-  const volPrev = +document.getElementById('p-vol-prev').value||1.2;
-  
-  return ALL.filter(s => {{
-    if(s.score < ms) return false;
-    if(ef && s.entry !== ef) return false;
-    if(inf && s.industry !== inf) return false;
-    if(cf && s.cap_size !== cf) return false;
-    
-    // 盤整突破硬篩選
-    if(ef === '盤整突破') {{
-      // 這裡需要從原始資料計算，但現在只有最終結果
-      // 實際上需要在 stock_screener.py 傳回這些數據
-      // 暫時用 entry 是否為盤整突破來判斷
-      if(s.entry !== '盤整突破') return false;
-    }}
-    
-    if(actSigs.size > 0) {{
-      const hasAll = [...actSigs].every(sig => s.signals.includes(sig));
-      if(!hasAll) return false;
-    }}
-    return true;
-  }}).sort((a,b) => {{
-    const va = a[sKey], vb = b[sKey];
-    return (typeof va === 'number' ? va-vb : String(va).localeCompare(String(vb))) * sDir;
-  }});
-}}
+    df = df.dropna(subset=["close", "volume"])
+    if len(df) < 65:
+        return None
 
-function render() {{
-  const data = getFiltered();
-  document.getElementById('cnt').textContent = data.length;
-  const tbody = document.getElementById('tbody');
-  
-  if(!data.length) {{
-    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:48px;color:var(--muted)">無符合條件</td></tr>';
-    return;
-  }}
-  
-  tbody.innerHTML = data.map(s => {{
-    const chgStr = (s.chg>=0?'+':'') + s.chg + '%';
-    const chgClass = s.chg>=0 ? 'up' : 'down';
-    const sigs = s.signals.map(sig => `<span class="sig sig-${{sig}}">${{sig}}</span>`).join('');
-    const url = `https://www.wantgoo.com/stock/${{s.code}}/technical-chart`;
-    
-    // 計算需要的欄位
-    const prev_vol = s.prev_vol || 0;
-    const vol_5d = s.vol_ma5 || 0;
-    const vol_ratio_5d = vol_5d > 0 ? (s.volume / vol_5d).toFixed(2) : 'N/A';
-    const vol_ratio_prev = prev_vol > 0 ? (s.volume / prev_vol).toFixed(2) : 'N/A';
-    const upper_shadow = s.upper_shadow_pct || 0;
-    const avg_price_5d = s.avg_price_5d || '-';
-    
-    return `<tr>
-      <td><a class="stock-link" href="${{url}}" target="_blank">${{s.code}}</a></td>
-      <td>${{s.name}}</td>
-      <td>${{s.prev_close || '-'}}</td>
-      <td>${{s.prev_vol ? s.prev_vol.toLocaleString() : '-'}}</td>
-      <td><strong>${{s.price}}</strong></td>
-      <td>${{s.volume.toLocaleString()}}</td>
-      <td>${{avg_price_5d}}</td>
-      <td class="${{chgClass}}">${{chgStr}}</td>
-      <td>${{upper_shadow.toFixed(2)}}%</td>
-      <td class="${{vol_ratio_5d >= 1.5 ? 'ok' : 'ng'}}">${{vol_ratio_5d}}</td>
-      <td class="${{vol_ratio_prev >= 1.2 ? 'ok' : 'ng'}}">${{vol_ratio_prev}}</td>
-      <td><strong>${{s.score}}</strong></td>
-      <td>${{sigs}}</td>
-      <td>${{s.industry}}</td>
-      <td>${{s.cap_size}}</td>
-      <td>${{s.entry}}</td>
-    </tr>`;
-  }}).join('');
-}}
+    latest = df.iloc[-1]
+    prev   = df.iloc[-2]
 
-function toggleSig(btn) {{
-  const sig = btn.dataset.sig;
-  if(actSigs.has(sig)) {{
-    actSigs.delete(sig);
-    btn.classList.remove('on');
-  }} else {{
-    actSigs.add(sig);
-    btn.classList.add('on');
-  }}
-  render();
-}}
+    # 基本過濾
+    if latest["close"] < CRITERIA["min_price"]:
+        return None
 
-function sortBy(key, th) {{
-  if(sKey === key) sDir *= -1;
-  else {{ sKey = key; sDir = -1; }}
-  document.querySelectorAll('th').forEach(t => t.textContent = t.textContent.replace(/ [▲▼]/, ''));
-  th.textContent += sDir === -1 ? ' ▼' : ' ▲';
-  render();
-}}
+    vol_ma20 = df["volume"].iloc[-21:-1].mean()
+    if vol_ma20 < CRITERIA["min_volume_daily"]:
+        return None
 
-render();
-</script>
-</body></html>"""
-    return html
+    # 均線計算
+    df["ma5"]  = df["close"].rolling(5).mean()
+    df["ma10"] = df["close"].rolling(10).mean()
+    df["ma20"] = df["close"].rolling(20).mean()
+    df["ma60"] = df["close"].rolling(60).mean()
+    latest = df.iloc[-1]
 
-def build_email_html(candidates, date):
-    return f"""<html><body style="font-family:Arial;background:#f9fafb">
-<div style="max-width:680px;margin:20px auto;background:#fff;border-radius:10px;overflow:hidden">
-  <div style="background:#1a1a2e;color:#f0b429;padding:20px;text-align:center">
-    <div style="font-size:24px;font-weight:900">飆股雷達</div>
-    <div style="font-size:12px;margin-top:8px">{date} • {len(candidates)}檔候選</div>
-  </div>
-  <div style="padding:20px">
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="background:#f3f4f6;border-bottom:2px solid #e5e7eb">
-        <th style="padding:10px;text-align:left">代號</th>
-        <th style="padding:10px;text-align:left">名稱</th>
-        <th style="padding:10px">現價</th>
-        <th style="padding:10px">漲跌</th>
-        <th style="padding:10px">評分</th>
-      </tr></thead>
-      <tbody>
-        {''.join(f'''<tr style="border-bottom:1px solid #e5e7eb">
-          <td style="padding:10px"><a href="https://www.wantgoo.com/stock/{s["code"]}/technical-chart" style="color:#2563eb;text-decoration:none">{s["code"]}</a></td>
-          <td style="padding:10px">{s["name"]}</td>
-          <td style="padding:10px;text-align:right">{s["price"]}</td>
-          <td style="padding:10px;text-align:right;color:{"#fc8181" if s["chg"]>=0 else "#68d391"}">{("+"+str(s["chg"]) if s["chg"]>=0 else str(s["chg"]))+"%"}</td>
-          <td style="padding:10px;text-align:right;font-weight:700">{s["score"]}</td>
-        </tr>''' for s in sorted(candidates, key=lambda x: x["score"], reverse=True)[:50])}
-      </tbody>
-    </table>
-  </div>
-  <div style="padding:14px;background:#f8fafc;text-align:center;font-size:10px;color:#6b7280">
-    ⚠️ 自動產生，僅供參考。資料來源：FinMind
-  </div>
-</div></body></html>"""
-
-def send_email(html, date, count):
-    cfg = EMAIL_CONFIG
-    if not cfg["password"] or not cfg["sender"]:
-        log.warning("未設定 Email")
-        return
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"📈 飆股雷達 {date} — {count}檔"
-    msg["From"] = cfg["sender"]
-    msg["To"] = cfg["receiver"]
-    msg.attach(MIMEText(html, "html", "utf-8"))
     try:
-        with smtplib.SMTP(cfg["smtp"], cfg["port"]) as s:
-            s.ehlo(); s.starttls()
-            s.login(cfg["sender"], cfg["password"])
-            s.sendmail(cfg["sender"], cfg["receiver"], msg.as_string())
-        log.info(f"✅ Email 寄出")
-    except Exception as e:
-        log.error(f"❌ 寄信失敗: {e}")
+        ma_bull4 = (latest["ma5"] > latest["ma10"] > latest["ma20"] > latest["ma60"]
+                    and latest["close"] > latest["ma5"])
+        ma_bull3 = (latest["ma5"] > latest["ma10"] > latest["ma20"]
+                    and latest["close"] > latest["ma5"])
+    except:
+        return None
 
-def main():
-    today = datetime.today().strftime("%Y-%m-%d")
-    candidates = run_screener(today)
-    html = build_html(candidates, today)
+    # 共用指標
+    vol_ratio    = latest["volume"] / vol_ma20 if vol_ma20 > 0 else 0
+    high20       = df["close"].iloc[-21:-1].max()
+    prev_high    = float(prev["high"])
+    prev_vol     = float(prev["volume"])
+    over_prev_h  = latest["close"] > prev_high
+    is_breakout  = latest["close"] > high20
+    body_pct     = (latest["close"] - latest["open"]) / latest["open"] * 100 if latest["open"] > 0 else 0
+    mom5         = (latest["close"] / df.iloc[-6]["close"] - 1) * 100 if len(df) >= 6 else 0
     
-    local_path = os.path.join(OUTPUT_DIR, f"report_{today}.html")
-    with open(local_path, "w", encoding="utf-8") as f:
-        f.write(html)
+    # 新指標：上影線、近5日均量、昨日量比
+    upper_shadow_pct = (latest["high"] - latest["close"]) / latest["close"] * 100 if latest["close"] > 0 else 0
+    vol_ma5 = df["volume"].iloc[-6:-1].mean()
+    vol_ratio_5d = latest["volume"] / vol_ma5 if vol_ma5 > 0 else 0
+    vol_ratio_prev = latest["volume"] / prev_vol if prev_vol > 0 else 0
+
+    # 底部打底天數
+    recent60 = df["close"].iloc[-61:-1]
+    base     = recent60.median()
+    in_range = ((recent60 >= base * 0.92) & (recent60 <= base * 1.08))
+    run = max_run = 0
+    for v in in_range:
+        run = run + 1 if v else 0
+        max_run = max(max_run, run)
+    consolidation_days = max_run
+
+    # 回檔計算：從近20日高點回落幅度
+    recent20_high = df["high"].iloc[-21:-1].max()
+    pullback_pct  = (recent20_high - latest["close"]) / recent20_high * 100 if recent20_high > 0 else 0
+    # 支撐不破：收盤未跌破 20MA 且未跌破前波低點
+    recent10_low  = df["low"].iloc[-11:-1].min()
+    above_ma20    = latest["close"] > latest["ma20"]
+    support_hold  = above_ma20 and latest["close"] > recent10_low
+
+    # ═══════════════════════════════════════
+    #  系統一：盤整突破評分（滿分100）
+    # ═══════════════════════════════════════
+    score_b  = 0
+    sigs_b   = []
     
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    index_path = os.path.join(root_dir, "index.html")
-    with open(index_path, "w", encoding="utf-8") as f:
-        f.write(html)
+    # 新盤整突破的 6 個必要條件（都是硬性要求）
+    # 條件1：股價創 N 日新高（N=20 預設）
+    high_n = df["close"].iloc[-21:-1].max()  # 近20日最高
+    is_new_high_n = latest["close"] > high_n
     
-    send_email(build_email_html(candidates, today), today, len(candidates))
+    # 條件2：今量 > 5日均量 × M倍（M=1.5 預設）
+    vol_threshold_5d = vol_ratio_5d >= 1.5
     
-    with open(os.path.join(OUTPUT_DIR, f"result_{today}.json"), "w", encoding="utf-8") as f:
-        json.dump({"date": today, "candidates": candidates}, f, ensure_ascii=False, indent=2)
+    # 條件3：上影線 < P%（P=2 預設）
+    upper_shadow_ok = upper_shadow_pct < 2.0
     
-    print(f"\n✅ 完成！{len(candidates)}檔")
+    # 條件4：收盤價 > 昨日最高點
+    over_yesterday_high = over_prev_h
+    
+    # 條件5：今日量 > 昨日量 × M倍（M=1.2 預設）
+    vol_vs_yesterday = vol_ratio_prev >= 1.2
+    
+    # 條件6：均線三線多排
+    ma_bull3_ok = ma_bull3
+    
+    # 盤整突破的 6 個必要條件都要滿足
+    breakout_valid = (is_new_high_n and vol_threshold_5d and upper_shadow_ok 
+                     and over_yesterday_high and vol_vs_yesterday and ma_bull3_ok)
+    
+    if breakout_valid:
+        score_b = 100  # 滿足所有條件就是 100 分
+        sigs_b = ["型態", "籌碼", "趨勢"]
+
+    # ═══════════════════════════════════════
+    #  系統二：回後買上漲評分（滿分100）
+    # ═══════════════════════════════════════
+    score_p  = 0
+    sigs_p   = []
+
+    # 條件1：均線多頭排列 —— 核心條件（趨勢必須健康）
+    if ma_bull4:
+        score_p += 30
+        sigs_p.append("趨勢")
+    elif ma_bull3:
+        score_p += 20
+        sigs_p.append("趨勢")
+    else:
+        score_p = 0  # 無趨勢直接不符合
+
+    # 條件2：支撐不破（收盤 > 20MA，未跌破前波低點）
+    if support_hold:
+        score_p += 25
+        sigs_p.append("型態")
+
+    # 條件3：過昨日最高點（確認反彈啟動）—— 核心條件
+    if over_prev_h:
+        score_p += 20
+
+    # 條件4：量縮回檔後今日放量（回檔量縮 + 今日量增）
+    vol_ma5_prev = df["volume"].iloc[-6:-1].mean()
+    vol_shrink   = vol_ma5_prev < vol_ma20 * 0.8
+    vol_expand   = latest["volume"] > vol_ma5_prev
+    if vol_shrink and vol_expand:
+        score_p += 15
+        sigs_p.append("籌碼")
+    elif vol_shrink:
+        score_p += 8
+
+    # 條件5：5日動能轉正
+    if mom5 >= 1:
+        score_p += 10
+        sigs_p.append("動能")
+    elif mom5 > 0:
+        score_p += 5
+
+    # 回後買上漲必要條件：有趨勢 + 支撐不破 + 過昨高
+    pullback_valid = (ma_bull3 and support_hold and over_prev_h)
+
+    # ═══════════════════════════════════════
+    #  系統三：強勢上漲評分（滿分100）
+    # ═══════════════════════════════════════
+    score_s  = 0
+    sigs_s   = []
+
+    # 條件1：近一月新高（強勢確認）—— 核心條件
+    high20_days = df["close"].iloc[-21:-1].max()
+    is_new_high = latest["close"] > high20_days
+    if is_new_high:
+        score_s += 35
+        sigs_s.append("型態")
+
+    # 條件2：均線多頭排列 —— 核心條件
+    if ma_bull4:
+        score_s += 30
+        sigs_s.append("趨勢")
+    elif ma_bull3:
+        score_s += 20
+        sigs_s.append("趨勢")
+    else:
+        score_s = 0
+
+    # 條件3：過昨日最高點（確認今日強勢）
+    if over_prev_h:
+        score_s += 15
+
+    # 條件4：爆量 ≥ 1.2x（主力參與）
+    if vol_ratio >= 1.5:
+        score_s += 20
+        sigs_s.append("籌碼")
+    elif vol_ratio >= 1.2:
+        score_s += 15
+        sigs_s.append("籌碼")
+
+    # 條件5：股價創新高且量能配合
+    if is_new_high and vol_ratio >= 1.2:
+        score_s += 10
+
+    # 條件6：5日動能轉正
+    if mom5 >= 1:
+        score_s += 10
+        sigs_s.append("動能")
+    elif mom5 > 0:
+        score_s += 5
+
+    # 強勢大型股必要條件：創新高 + 有趨勢 + 過昨高
+    strong_valid = (is_new_high and ma_bull3 and over_prev_h)
+
+    # ═══════════════════════════════════════
+    #  系統四：題材熱股評分（滿分100）
+    # ═══════════════════════════════════════
+    score_t  = 0
+    sigs_t   = []
+
+    # 由 run_screener 傳入當日熱門產業
+    # 條件1：符合熱門題材 —— 核心條件
+    if hot_industries:
+        score_t += 40
+        sigs_t.append("題材")
+    
+    # 條件2：三線多排 —— 核心條件
+    if ma_bull3:
+        score_t += 25
+        sigs_t.append("趨勢")
+    else:
+        score_t = 0
+
+    # 條件3：爆量 ≥ 1.2x（題材個股需要量能確認）
+    if vol_ratio >= 1.2:
+        score_t += 20
+        sigs_t.append("籌碼")
+
+    # 條件4：過昨日最高點（短期強勢）
+    if over_prev_h:
+        score_t += 10
+
+    # 條件5：5日動能轉正
+    if mom5 >= 1:
+        score_t += 10
+        sigs_t.append("動能")
+    elif mom5 > 0:
+        score_t += 5
+
+    # 題材熱股必要條件：符合熱門題材 + 三線多排 + 爆量≥1.2x
+    theme_valid = (hot_industries and ma_bull3 and vol_ratio >= 1.2)
+
+    # ═══════════════════════════════════════
+    #  決定最終結果
+    # ═══════════════════════════════════════
+    MIN_SCORE = CRITERIA["min_score"]
+
+    result_entry  = None
+    result_score  = 0
+    result_sigs   = []
+
+    if breakout_valid and score_b >= MIN_SCORE:
+        result_entry = "盤整突破"
+        result_score = min(score_b, 100)
+        result_sigs  = sigs_b
+    elif pullback_valid and score_p >= MIN_SCORE:
+        result_entry = "回後買上漲"
+        result_score = min(score_p, 100)
+        result_sigs  = sigs_p
+    elif strong_valid and score_s >= 60:
+        result_entry = "強勢上漲"
+        result_score = min(score_s, 100)
+        result_sigs  = sigs_s
+    elif theme_valid and score_t >= 55:
+        result_entry = "題材熱股"
+        result_score = min(score_t, 100)
+        result_sigs  = sigs_t
+    else:
+        return None
+
+    chg = (latest["close"] / prev["close"] - 1) * 100 if prev["close"] > 0 else 0
+
+    # 計算5日均價
+    avg_price_5d = df["close"].iloc[-6:-1].mean() if len(df) >= 6 else latest["close"]
+    
+    return {
+        "code"              : stock_id,
+        "price"             : round(float(latest["close"]), 1),
+        "chg"               : round(chg, 2),
+        "score"             : result_score,
+        "signals"           : list(dict.fromkeys(result_sigs)),
+        "consolidation_days": int(consolidation_days),
+        "vol_ratio"         : round(vol_ratio, 2),
+        "momentum_5d"       : round(mom5, 2),
+        "entry"             : result_entry,
+        "ma_bull4"          : bool(ma_bull4),
+        "prev_close"        : round(float(prev["close"]), 1),
+        "prev_vol"          : int(prev_vol),
+        "volume"            : int(latest["volume"]),
+        "avg_price_5d"      : round(avg_price_5d, 1),
+        "upper_shadow_pct"  : round(upper_shadow_pct, 2),
+        "vol_ma5"           : round(vol_ma5, 0),
+        "details"           : {
+            "breakout"      : bool(is_breakout),
+            "over_prev_high": bool(over_prev_h),
+            "support_hold"  : bool(support_hold),
+            "pullback_pct"  : round(pullback_pct, 2),
+            "body_pct"      : round(body_pct, 2),
+        }
+    }
+
+
+def run_screener(date: str = None, max_workers: int = 3) -> list[dict]:
+    if date is None:
+        date = datetime.today().strftime("%Y-%m-%d")
+
+    # 取得股票清單
+    universe = get_stock_universe()
+    if universe.empty:
+        log.error("無法取得股票清單，終止")
+        return []
+
+    stock_ids = universe["stock_id"].tolist()
+
+    # 建立代號→產業對照
+    industry_lookup = {}
+    name_lookup     = {}
+    if "industry_category" in universe.columns:
+        for _, row in universe.iterrows():
+            sid = row["stock_id"]
+            industry_lookup[sid] = classify_industry(str(row.get("industry_category", "")))
+            name_lookup[sid]     = str(row.get("stock_name", sid))
+
+    # 動態偵測熱門產業：統計每個產業在全市場的股票數
+    industry_count = Counter(industry_lookup.values())
+    
+    # 取出現股數最多的前 3 個產業作為當日熱門題材
+    hot_industries = set([ind for ind, cnt in industry_count.most_common(3)])
+    log.info(f"當日熱門產業: {', '.join([f'{ind}({industry_count[ind]}檔)' for ind in sorted(hot_industries, key=lambda x: industry_count[x], reverse=True)])}")
+
+    log.info(f"開始掃描 {len(stock_ids)} 檔，基準日: {date}")
+    results  = []
+    total    = len(stock_ids)
+    done     = 0
+
+    # 使用 ThreadPoolExecutor 加速
+    def worker(sid):
+        # 判斷該股票是否屬於熱門產業
+        stock_hot_industries = {industry_lookup.get(sid, "")} if industry_lookup.get(sid, "") in hot_industries else set()
+        result = analyze_stock(sid, date, stock_hot_industries)
+        time.sleep(0.3)
+        return sid, result
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(worker, sid): sid for sid in stock_ids}
+        seen_codes = set()
+        for future in as_completed(futures):
+            done += 1
+            sid, result = future.result()
+            if result and sid not in seen_codes:
+                seen_codes.add(sid)
+                result["industry"] = industry_lookup.get(sid, "其他")
+                result["name"]     = name_lookup.get(sid, sid)
+                result["cap_size"] = classify_market_cap(result["price"])
+                results.append(result)
+            if done % 50 == 0 or done == total:
+                log.info(f"進度: {done}/{total}，目前找到 {len(results)} 檔")
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    log.info(f"掃描完成，共 {len(results)} 檔符合條件")
+    return results
+
 
 if __name__ == "__main__":
-    main()
+    today      = datetime.today().strftime("%Y-%m-%d")
+    candidates = run_screener(today)
+
+    out_path = os.path.join(OUTPUT_DIR, f"result_{today}.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump({"date": today, "candidates": candidates}, f, ensure_ascii=False, indent=2)
+
+    log.info(f"結果儲存: {out_path}")
+    print(f"\n✅ 今日飆股候選：{len(candidates)} 檔")
+    for s in candidates[:20]:
+        print(f"  {s['code']} {s['name']:8s}  評分:{s['score']:3d}  {s['industry']:8s}  {s['cap_size']}  {s['entry']}")
