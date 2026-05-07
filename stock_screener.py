@@ -181,10 +181,17 @@ def analyze_stock(stock_id: str, end_date: str, hot_industries: set = None) -> d
     vol_ratio    = latest["volume"] / vol_ma20 if vol_ma20 > 0 else 0
     high20       = df["close"].iloc[-21:-1].max()
     prev_high    = float(prev["high"])
+    prev_vol     = float(prev["volume"])
     over_prev_h  = latest["close"] > prev_high
     is_breakout  = latest["close"] > high20
     body_pct     = (latest["close"] - latest["open"]) / latest["open"] * 100 if latest["open"] > 0 else 0
     mom5         = (latest["close"] / df.iloc[-6]["close"] - 1) * 100 if len(df) >= 6 else 0
+    
+    # 新指標：上影線、近5日均量、昨日量比
+    upper_shadow_pct = (latest["high"] - latest["close"]) / latest["close"] * 100 if latest["close"] > 0 else 0
+    vol_ma5 = df["volume"].iloc[-6:-1].mean()
+    vol_ratio_5d = latest["volume"] / vol_ma5 if vol_ma5 > 0 else 0
+    vol_ratio_prev = latest["volume"] / prev_vol if prev_vol > 0 else 0
 
     # 底部打底天數
     recent60 = df["close"].iloc[-61:-1]
@@ -209,53 +216,34 @@ def analyze_stock(stock_id: str, end_date: str, hot_industries: set = None) -> d
     # ═══════════════════════════════════════
     score_b  = 0
     sigs_b   = []
-
-    # 條件1：底部打底 ≥ 20天（地基紮實）—— 核心條件
-    if consolidation_days >= 20:
-        score_b += 35
-        sigs_b.append("型態")
-    elif consolidation_days >= 10:
-        score_b += 18
-        sigs_b.append("型態")
-
-    # 條件2：突破近20日高點 —— 核心條件
-    if is_breakout:
-        score_b += 30
-        if "型態" not in sigs_b:
-            sigs_b.append("型態")
-
-    # 條件3：過昨日最高點（確認突破有效）
-    if over_prev_h:
-        score_b += 20
-
-    # 條件4：爆量 ≥ 1.5x（主力進場）
-    if vol_ratio >= 1.5:
-        score_b += 20
-        sigs_b.append("籌碼")
-    elif vol_ratio >= 1.2:
-        score_b += 10
-        sigs_b.append("籌碼")
-
-    # 條件5：陽線實體 ≥ 1.5%
-    if body_pct >= 2.0:
-        score_b += 10
-    elif body_pct >= 1.5:
-        score_b += 5
-
-    # 條件6：均線多頭加分
-    if ma_bull4:
-        score_b += 10
-        sigs_b.append("趨勢")
-    elif ma_bull3:
-        score_b += 5
-        sigs_b.append("趨勢")
-
-    # 動能加分
-    if mom5 >= 3:
-        sigs_b.append("動能")
-
-    # 盤整突破必要條件：底部打底 + 突破 + 過昨高，三者缺一不可
-    breakout_valid = (consolidation_days >= 20 and is_breakout and over_prev_h)
+    
+    # 新盤整突破的 6 個必要條件（都是硬性要求）
+    # 條件1：股價創 N 日新高（N=20 預設）
+    high_n = df["close"].iloc[-21:-1].max()  # 近20日最高
+    is_new_high_n = latest["close"] > high_n
+    
+    # 條件2：今量 > 5日均量 × M倍（M=1.5 預設）
+    vol_threshold_5d = vol_ratio_5d >= 1.5
+    
+    # 條件3：上影線 < P%（P=2 預設）
+    upper_shadow_ok = upper_shadow_pct < 2.0
+    
+    # 條件4：收盤價 > 昨日最高點
+    over_yesterday_high = over_prev_h
+    
+    # 條件5：今日量 > 昨日量 × M倍（M=1.2 預設）
+    vol_vs_yesterday = vol_ratio_prev >= 1.2
+    
+    # 條件6：均線三線多排
+    ma_bull3_ok = ma_bull3
+    
+    # 盤整突破的 6 個必要條件都要滿足
+    breakout_valid = (is_new_high_n and vol_threshold_5d and upper_shadow_ok 
+                     and over_yesterday_high and vol_vs_yesterday and ma_bull3_ok)
+    
+    if breakout_valid:
+        score_b = 100  # 滿足所有條件就是 100 分
+        sigs_b = ["型態", "籌碼", "趨勢"]
 
     # ═══════════════════════════════════════
     #  系統二：回後買上漲評分（滿分100）
@@ -459,7 +447,7 @@ def run_screener(date: str = None, max_workers: int = 3) -> list[dict]:
         for _, row in universe.iterrows():
             sid = row["stock_id"]
             industry_lookup[sid] = classify_industry(str(row.get("industry_category", "")))
-            name_lookup[sid] = str(row.get("name", row.get("stock_name", sid)))
+            name_lookup[sid]     = str(row.get("stock_name", sid))
 
     # 動態偵測熱門產業：統計每個產業在全市場的股票數
     industry_count = Counter(industry_lookup.values())
