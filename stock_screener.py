@@ -287,8 +287,8 @@ def analyze_stock(stock_id: str, end_date: str, hot_industries: set = None) -> d
     elif mom5 > 0:
         score_p += 5
 
-    # 回後買上漲必要條件：有趨勢 + 支撐不破 + 過昨高
-    pullback_valid = (ma_bull3 and support_hold and over_prev_h)
+    # 回後買上漲必要條件：有趨勢 + 支撐不破 + 過昨高 + 爆量 ≥ 1.2x
+    pullback_valid = (ma_bull3 and support_hold and over_prev_h and vol_ratio_prev >= 1.2)
 
     # ═══════════════════════════════════════
     #  系統三：強勢上漲評分（滿分100）
@@ -336,8 +336,8 @@ def analyze_stock(stock_id: str, end_date: str, hot_industries: set = None) -> d
     elif mom5 > 0:
         score_s += 5
 
-    # 強勢大型股必要條件：創新高 + 有趨勢 + 過昨高
-    strong_valid = (is_new_high and ma_bull3 and over_prev_h)
+    # 強勢大型股必要條件：創新高 + 有趨勢 + 過昨高 + 爆量 ≥ 1.2x
+    strong_valid = (is_new_high and ma_bull3 and over_prev_h and vol_ratio_prev >= 1.2)
 
     # ═══════════════════════════════════════
     #  系統四：題材熱股評分（滿分100）
@@ -374,8 +374,8 @@ def analyze_stock(stock_id: str, end_date: str, hot_industries: set = None) -> d
     elif mom5 > 0:
         score_t += 5
 
-    # 題材熱股必要條件：符合熱門題材 + 三線多排 + 爆量≥1.2x
-    theme_valid = (hot_industries and ma_bull3 and vol_ratio >= 1.2)
+    # 題材熱股必要條件：符合熱門題材 + 三線多排 + 爆量≥1.2x（昨日量倍數）
+    theme_valid = (hot_industries and ma_bull3 and vol_ratio_prev >= 1.2)
 
     # ═══════════════════════════════════════
     #  決定最終結果
