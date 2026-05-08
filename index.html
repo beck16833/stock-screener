@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 2026-05-07</title>
+<title>飆股雷達 2026-05-08</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}
@@ -42,7 +42,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-05-07（週四） • 6 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-05-08（週五） • 2 檔</div>
 </header>
 <main>
 <div class="filter-panel">
@@ -61,7 +61,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
       <label style="font-size:11px;color:var(--muted)">產業別</label>
       <select class="f-select" id="f-ind" onchange="render()">
         <option value="">全部</option>
-        <option value="電子零組件">電子零組件</option><option value="航運">航運</option><option value="觀光休閒">觀光休閒</option><option value="其他">其他</option>
+        <option value="航運">航運</option><option value="其他">其他</option>
       </select>
     </div>
     <div>
@@ -129,7 +129,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [{"code": "6873", "price": 93.8, "chg": 5.27, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "consolidation_days": 16, "vol_ratio": 1.51, "momentum_5d": 6.83, "entry": "盤整突破", "ma_bull4": false, "prev_close": 89.1, "prev_vol": 520056, "volume": 1006323, "avg_price_5d": 89.6, "upper_shadow_pct": 0.21, "vol_ma5": 450349.0, "details": {"breakout": true, "over_prev_high": true, "support_hold": true, "pullback_pct": -2.07, "body_pct": 5.27}, "industry": "其他", "name": "泓德能源", "cap_size": "小型股"}, {"code": "3551", "price": 215.0, "chg": 3.12, "score": 100, "signals": ["趨勢", "型態", "籌碼", "動能"], "consolidation_days": 36, "vol_ratio": 1.66, "momentum_5d": 9.97, "entry": "回後買上漲", "ma_bull4": true, "prev_close": 208.5, "prev_vol": 3458489, "volume": 3821458, "avg_price_5d": 200.4, "upper_shadow_pct": 0.23, "vol_ma5": 1636517.0, "details": {"breakout": true, "over_prev_high": true, "support_hold": true, "pullback_pct": 2.71, "body_pct": 1.65}, "industry": "其他", "name": "世禾", "cap_size": "中型股"}, {"code": "6757", "price": 55.2, "chg": 9.96, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "consolidation_days": 34, "vol_ratio": 4.7, "momentum_5d": 11.29, "entry": "盤整突破", "ma_bull4": false, "prev_close": 50.2, "prev_vol": 864806, "volume": 4383483, "avg_price_5d": 50.1, "upper_shadow_pct": 0.0, "vol_ma5": 1039793.0, "details": {"breakout": true, "over_prev_high": true, "support_hold": true, "pullback_pct": -6.56, "body_pct": 0.55}, "industry": "航運", "name": "台灣虎航", "cap_size": "小型股"}, {"code": "2392", "price": 40.5, "chg": 3.85, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "consolidation_days": 24, "vol_ratio": 1.6, "momentum_5d": 7.14, "entry": "盤整突破", "ma_bull4": false, "prev_close": 39.0, "prev_vol": 2979338, "volume": 4615775, "avg_price_5d": 37.9, "upper_shadow_pct": 1.11, "vol_ma5": 2570840.0, "details": {"breakout": true, "over_prev_high": true, "support_hold": true, "pullback_pct": 0.86, "body_pct": 3.05}, "industry": "電子零組件", "name": "正崴", "cap_size": "小型股"}, {"code": "1736", "price": 130.0, "chg": 5.69, "score": 75, "signals": ["趨勢", "型態", "動能"], "consolidation_days": 25, "vol_ratio": 0.91, "momentum_5d": 1.17, "entry": "回後買上漲", "ma_bull4": false, "prev_close": 123.0, "prev_vol": 491059, "volume": 825575, "avg_price_5d": 124.6, "upper_shadow_pct": 0.38, "vol_ma5": 1037648.0, "details": {"breakout": false, "over_prev_high": true, "support_hold": true, "pullback_pct": 6.81, "body_pct": 5.69}, "industry": "觀光休閒", "name": "喬山", "cap_size": "中型股"}, {"code": "2408", "price": 287.0, "chg": 1.77, "score": 75, "signals": ["趨勢", "型態", "動能"], "consolidation_days": 7, "vol_ratio": 1.7, "momentum_5d": 22.13, "entry": "回後買上漲", "ma_bull4": false, "prev_close": 282.0, "prev_vol": 149468917, "volume": 197355586, "avg_price_5d": 245.2, "upper_shadow_pct": 3.14, "vol_ma5": 145169867.0, "details": {"breakout": true, "over_prev_high": true, "support_hold": true, "pullback_pct": -1.77, "body_pct": -2.05}, "industry": "其他", "name": "南亞科", "cap_size": "中型股"}];
+const ALL = [{"code": "3551", "price": 210.0, "chg": -2.33, "score": 95, "signals": ["題材", "趨勢", "籌碼", "動能"], "consolidation_days": 35, "vol_ratio": 2.75, "momentum_5d": 7.69, "entry": "題材熱股", "ma_bull4": true, "prev_close": 215.0, "prev_vol": 3821458, "volume": 6787704, "avg_price_5d": 204.3, "upper_shadow_pct": 4.76, "vol_ma5": 2254429.0, "details": {"breakout": false, "over_prev_high": false, "support_hold": true, "pullback_pct": 4.98, "body_pct": -4.33}, "industry": "其他", "name": "世禾", "cap_size": "中型股"}, {"code": "6757", "price": 57.0, "chg": 3.26, "score": 75, "signals": ["趨勢", "型態", "動能"], "consolidation_days": 34, "vol_ratio": 6.51, "momentum_5d": 14.8, "entry": "回後買上漲", "ma_bull4": false, "prev_close": 55.2, "prev_vol": 4383483, "volume": 7144245, "avg_price_5d": 51.2, "upper_shadow_pct": 5.26, "vol_ma5": 1721981.0, "details": {"breakout": true, "over_prev_high": true, "support_hold": true, "pullback_pct": -3.26, "body_pct": 1.79}, "industry": "航運", "name": "台灣虎航", "cap_size": "小型股"}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function showBreakoutParams() {
