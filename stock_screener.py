@@ -1,512 +1,337 @@
-"""
-飆股雷達 v3 - 全市場掃描核心 + 動態題材偵測
-資料來源: FinMind
-支援: 上市 + 上櫃，約 1,700+ 檔
-四套獨立評分系統：盤整突破 / 回後買上漲 / 強勢上漲 / 題材熱股
-"""
-
-import os
-import json
-import time
-import logging
-import requests
-import pandas as pd
+"""飆股雷達選股系統 v4 - 四套獨立評分系統"""
+import os, json, logging
 from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+import pandas as pd
+import requests
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 log = logging.getLogger(__name__)
 
-FINMIND_TOKEN = os.getenv("FINMIND_TOKEN", "")
-OUTPUT_DIR    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
 BASE_URL = "https://api.finmindtrade.com/api/v4/data"
 
-# ── 選股門檻 ────────────────────────────────────────────
 CRITERIA = {
     "min_consolidation_days": 20,
-    "min_volume_ratio"      : 1.0,
-    "min_score"             : 65,
-    "min_price"             : 20,
-    "min_volume_daily"      : 500000,
+    "min_volume_ratio": 1.0,
+    "min_score": 55,
+    "min_price": 20,
+    "min_volume_daily": 500000,
 }
 
-# ── 產業分類對照表 ──────────────────────────────────────
 INDUSTRY_MAP = {
-    "半導體": ["半導體", "積體電路", "晶圓", "IC設計", "封測"],
-    "電子零組件": ["電子零組件", "被動元件", "連接器", "印刷電路板", "PCB"],
-    "電腦及周邊": ["電腦及周邊", "伺服器", "筆記型電腦", "儲存"],
-    "通訊網路": ["通訊網路", "網路", "電信", "5G", "光纖"],
-    "光電": ["光電", "LED", "面板", "顯示器"],
-    "金融保險": ["金融", "銀行", "保險", "證券", "金控"],
-    "生技醫療": ["生技", "醫療", "製藥", "醫材", "健康"],
-    "電機機械": ["電機", "機械", "自動化", "馬達"],
-    "鋼鐵金屬": ["鋼鐵", "金屬", "鋁", "銅"],
-    "塑膠化工": ["塑膠", "化工", "石化", "橡膠"],
-    "食品": ["食品", "飲料", "農業"],
-    "紡織": ["紡織", "成衣"],
-    "建材營造": ["建材", "營造", "水泥", "玻璃"],
-    "航運": ["航運", "海運", "空運", "貨運"],
-    "觀光休閒": ["觀光", "休閒", "飯店", "旅遊"],
-    "其他": [],
+    "水泥": "水泥",
+    "食品": "食品",
+    "塑膠": "塑膠",
+    "紡織": "紡織",
+    "電機": "電機",
+    "電器電纜": "電器電纜",
+    "玻璃陶瓷": "玻璃陶瓷",
+    "鋼鐵": "鋼鐵",
+    "橡膠": "橡膠",
+    "造紙": "造紙",
+    "化肥": "化肥",
+    "化學": "化學",
+    "生技醫療": "生技醫療",
+    "油電燃氣": "油電燃氣",
+    "玻璃": "玻璃",
+    "陶瓷": "陶瓷",
+    "營建": "營建",
+    "運輸": "運輸",
+    "觀光": "觀光",
+    "金融保險": "金融保險",
+    "貿易百貨": "貿易百貨",
+    "綜合": "綜合",
+    "其他": "其他",
 }
 
-def classify_industry(industry_str: str) -> str:
-    if not industry_str:
-        return "其他"
-    for group, keywords in INDUSTRY_MAP.items():
-        if group == "其他":
-            continue
-        if any(kw in industry_str for kw in keywords):
-            return group
-        if group in industry_str:
-            return group
-    return "其他"
-
-def classify_market_cap(close: float, shares: float = None) -> str:
-    """依股價簡易分類（無股本資料時用股價代替）"""
-    if close >= 500:
-        return "大型股"
-    elif close >= 100:
-        return "中型股"
-    elif close >= 30:
-        return "小型股"
-    else:
-        return "微型股"
-
-# ── FinMind API ─────────────────────────────────────────
-def fm_get(dataset: str, stock_id: str = "", start: str = "", end: str = "",
-           extra: dict = None) -> pd.DataFrame:
-    params = {
-        "dataset"   : dataset,
-        "token"     : FINMIND_TOKEN,
-    }
-    if stock_id: params["data_id"]    = stock_id
-    if start:    params["start_date"] = start
-    if end:      params["end_date"]   = end
-    if extra:    params.update(extra)
-
-    for attempt in range(3):
-        try:
-            r = requests.get(BASE_URL, params=params, timeout=20)
-            r.raise_for_status()
-            data = r.json()
-            if data.get("status") == 200 and data.get("data"):
-                return pd.DataFrame(data["data"])
-            return pd.DataFrame()
-        except Exception as e:
-            if attempt == 2:
-                log.debug(f"[FinMind] {stock_id} {dataset} 失敗: {e}")
-            time.sleep(1)
-    return pd.DataFrame()
-
-
-def get_stock_universe() -> pd.DataFrame:
-    """取得全市場股票清單（上市+上櫃）"""
-    log.info("取得上市股票清單...")
-    listed = fm_get("TaiwanStockInfo")
-
-    if listed.empty:
-        log.error("無法取得股票清單")
+def get_stock_universe():
+    try:
+        df = pd.read_csv("https://finmindtrade.com/data/TaiwanStockInfo.csv")
+        df = df[df["market_type"].isin(["上市", "上櫃"])]
+        df = df.drop_duplicates(subset=["stock_id"])
+        return df
+    except Exception as e:
+        log.error(f"❌ 取得股票清單失敗: {e}")
         return pd.DataFrame()
 
-    # 過濾：只保留普通股（排除 ETF、特別股、權證等）
-    if "type" in listed.columns:
-        listed = listed[listed["type"].isin(["twse", "tpex"])]
+def classify_industry(cat):
+    for key, val in INDUSTRY_MAP.items():
+        if key in str(cat):
+            return val
+    return "其他"
 
-    # 排除代號含字母的（權證、ETF等）
-    if "stock_id" in listed.columns:
-        listed = listed[listed["stock_id"].str.match(r'^\d{4}$', na=False)]
-
-    log.info(f"共取得 {len(listed)} 檔股票")
-    return listed
-
-
-def analyze_stock(stock_id: str, end_date: str, hot_industries: set = None) -> dict | None:
-    if hot_industries is None:
-        hot_industries = set()
-    
-    start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=200)).strftime("%Y-%m-%d")
-
-    df = fm_get("TaiwanStockPrice", stock_id, start, end_date)
-    if df.empty or len(df) < 65:
-        return None
-
-    # 欄位標準化
-    df = df.rename(columns={
-        "Trading_Volume": "volume",
-        "max": "high",
-        "min": "low",
-    })
-
-    df = df.sort_values("date").reset_index(drop=True)
-    for col in ["close", "open", "high", "low", "volume"]:
-        if col not in df.columns:
-            return None
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    df = df.dropna(subset=["close", "volume"])
-    if len(df) < 65:
-        return None
-
-    latest = df.iloc[-1]
-    prev   = df.iloc[-2]
-
-    # 基本過濾
-    if latest["close"] < CRITERIA["min_price"]:
-        return None
-
-    vol_ma20 = df["volume"].iloc[-21:-1].mean()
-    if vol_ma20 < CRITERIA["min_volume_daily"]:
-        return None
-
-    # 均線計算
-    df["ma5"]  = df["close"].rolling(5).mean()
-    df["ma10"] = df["close"].rolling(10).mean()
-    df["ma20"] = df["close"].rolling(20).mean()
-    df["ma60"] = df["close"].rolling(60).mean()
-    latest = df.iloc[-1]
-
+def fetch_stock_data(stock_id, end_date):
     try:
-        ma_bull4 = (latest["ma5"] > latest["ma10"] > latest["ma20"] > latest["ma60"]
-                    and latest["close"] > latest["ma5"])
-        ma_bull3 = (latest["ma5"] > latest["ma10"] > latest["ma20"]
-                    and latest["close"] > latest["ma5"])
-    except:
+        params = {
+            "dataset": "TaiwanStockPrice",
+            "data_id": stock_id,
+            "start_date": (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=250)).strftime("%Y-%m-%d"),
+            "end_date": end_date,
+            "token": os.getenv("FINMIND_TOKEN", "")
+        }
+        r = requests.get(BASE_URL, params=params, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if data["data"]:
+                df = pd.DataFrame(data["data"])
+                df = df.rename(columns={"Trading_Volume": "volume", "max": "high", "min": "low"})
+                df["close"] = pd.to_numeric(df["close"], errors="coerce")
+                df["high"] = pd.to_numeric(df["high"], errors="coerce")
+                df["low"] = pd.to_numeric(df["low"], errors="coerce")
+                df["open"] = pd.to_numeric(df["open"], errors="coerce")
+                df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
+                df = df.dropna(subset=["close"])
+                return df.sort_values("date").reset_index(drop=True)
+    except Exception as e:
+        log.debug(f"⚠️ {stock_id} 資料取得失敗: {e}")
+    return pd.DataFrame()
+
+def analyze_stock(stock_id, stock_name, industry, df, date):
+    if df.empty or len(df) < 60:
         return None
-
+    
+    latest = df.iloc[-1]
+    prev = df.iloc[-2] if len(df) >= 2 else latest
+    
+    price = float(latest["close"])
+    if price < CRITERIA["min_price"]:
+        return None
+    
+    vol = int(latest["volume"])
+    if vol < CRITERIA["min_volume_daily"]:
+        return None
+    
     # 共用指標
-    vol_ratio    = latest["volume"] / vol_ma20 if vol_ma20 > 0 else 0
-    high20       = df["close"].iloc[-21:-1].max()
-    prev_high    = float(prev["high"])
-    prev_vol     = float(prev["volume"])
-    over_prev_h  = latest["close"] > prev_high
-    is_breakout  = latest["close"] > high20
-    body_pct     = (latest["close"] - latest["open"]) / latest["open"] * 100 if latest["open"] > 0 else 0
-    mom5         = (latest["close"] / df.iloc[-6]["close"] - 1) * 100 if len(df) >= 6 else 0
+    chg = ((price - float(prev["close"])) / float(prev["close"]) * 100) if prev["close"] > 0 else 0
+    vol_ma20 = df["volume"].iloc[-21:-1].mean() if len(df) >= 21 else df["volume"].mean()
+    vol_ma5 = df["volume"].iloc[-6:-1].mean() if len(df) >= 6 else df["volume"].mean()
+    prev_vol = float(prev["volume"])
+    prev_close = float(prev["close"])
+    prev_high = float(prev["high"])
     
-    # 新指標：上影線、近5日均量、昨日量比
-    upper_shadow_pct = (latest["high"] - latest["close"]) / latest["close"] * 100 if latest["close"] > 0 else 0
-    vol_ma5 = df["volume"].iloc[-6:-1].mean()
-    vol_ratio_5d = latest["volume"] / vol_ma5 if vol_ma5 > 0 else 0
-    vol_ratio_prev = latest["volume"] / prev_vol if prev_vol > 0 else 0
-
-    # 底部打底天數
-    recent60 = df["close"].iloc[-61:-1]
-    base     = recent60.median()
-    in_range = ((recent60 >= base * 0.92) & (recent60 <= base * 1.08))
-    run = max_run = 0
-    for v in in_range:
-        run = run + 1 if v else 0
-        max_run = max(max_run, run)
-    consolidation_days = max_run
-
-    # 回檔計算：從近20日高點回落幅度
-    recent20_high = df["high"].iloc[-21:-1].max()
-    pullback_pct  = (recent20_high - latest["close"]) / recent20_high * 100 if recent20_high > 0 else 0
-    # 支撐不破：收盤未跌破 20MA 且未跌破前波低點
-    recent10_low  = df["low"].iloc[-11:-1].min()
-    above_ma20    = latest["close"] > latest["ma20"]
-    support_hold  = above_ma20 and latest["close"] > recent10_low
-
+    # 新指標
+    upper_shadow_pct = ((latest["high"] - latest["close"]) / latest["close"] * 100) if latest["close"] > 0 else 0
+    vol_ratio_prev = vol / prev_vol if prev_vol > 0 else 0
+    vol_ratio_5d = vol / vol_ma5 if vol_ma5 > 0 else 0
+    
+    # 5日均價
+    avg_price_5d = df["close"].iloc[-6:-1].mean() if len(df) >= 6 else price
+    
+    # 均線
+    ma5 = df["close"].iloc[-6:-1].mean() if len(df) >= 6 else price
+    ma10 = df["close"].iloc[-11:-1].mean() if len(df) >= 11 else price
+    ma20 = df["close"].iloc[-21:-1].mean() if len(df) >= 21 else price
+    ma60 = df["close"].iloc[-61:-1].mean() if len(df) >= 61 else price
+    
+    ma_bull3 = (ma5 > ma10 > ma20) and (price > ma5)
+    ma_bull4 = (ma5 > ma10 > ma20 > ma60) and (price > ma5)
+    
+    # 新高判定
+    high20 = df["close"].iloc[-21:-1].max() if len(df) >= 21 else 0
+    is_new_high_20 = price > high20
+    
+    # 昨日最高點
+    over_prev_h = price > prev_high
+    
+    # 量縮判定
+    vol_ma5_thresh = vol_ma20 * 0.80
+    vol_reduced = vol_ma5 < vol_ma5_thresh
+    
+    # 20日均量
+    vol_ratio_20d = vol / vol_ma20 if vol_ma20 > 0 else 0
+    
+    # 動能
+    mom5 = ((price / df.iloc[-6]["close"] - 1) * 100) if len(df) >= 6 and df.iloc[-6]["close"] > 0 else 0
+    
+    # 熱門產業（動態偵測）
+    hot_industries = []  # 在 run_screener 中動態生成
+    
+    result_score = 0
+    result_sigs = []
+    result_entry = None
+    
     # ═══════════════════════════════════════
-    #  系統一：盤整突破評分（滿分100）
+    #  系統一：盤整突破（必備 5 條件）
     # ═══════════════════════════════════════
-    score_b  = 0
-    sigs_b   = []
+    score_b = 0
+    sigs_b = []
     
-    # 新盤整突破的 6 個必要條件（都是硬性要求）
-    # 條件1：股價創 N 日新高（N=20 預設）
-    high_n = df["close"].iloc[-21:-1].max()  # 近20日最高
-    is_new_high_n = latest["close"] > high_n
+    # 必備條件檢查
+    b1 = is_new_high_20
+    b2 = ma_bull3
+    b3 = over_prev_h
+    b4 = vol_ratio_prev >= 1.0  # 今日量 > 昨日量
+    b5 = upper_shadow_pct < 3.0  # 上影線 < 3%
     
-    # 條件2：今量 > 5日均量 × M倍（M=1.5 預設）
-    vol_threshold_5d = vol_ratio_5d >= 1.5
-    
-    # 條件3：上影線 < P%（P=2 預設）
-    upper_shadow_ok = upper_shadow_pct < 2.0
-    
-    # 條件4：收盤價 > 昨日最高點
-    over_yesterday_high = over_prev_h
-    
-    # 條件5：今日量 > 昨日量 × M倍（M=1.2 預設）
-    vol_vs_yesterday = vol_ratio_prev >= 1.2
-    
-    # 條件6：均線三線多排
-    ma_bull3_ok = ma_bull3
-    
-    # 盤整突破的 6 個必要條件都要滿足
-    breakout_valid = (is_new_high_n and vol_threshold_5d and upper_shadow_ok 
-                     and over_yesterday_high and vol_vs_yesterday and ma_bull3_ok)
+    breakout_valid = b1 and b2 and b3 and b4 and b5
     
     if breakout_valid:
-        score_b = 100  # 滿足所有條件就是 100 分
+        score_b = 100
         sigs_b = ["型態", "籌碼", "趨勢"]
-
-    # ═══════════════════════════════════════
-    #  系統二：回後買上漲評分（滿分100）
-    # ═══════════════════════════════════════
-    score_p  = 0
-    sigs_p   = []
-
-    # 條件1：均線多頭排列 —— 核心條件（趨勢必須健康）
-    if ma_bull4:
-        score_p += 30
-        sigs_p.append("趨勢")
-    elif ma_bull3:
-        score_p += 20
-        sigs_p.append("趨勢")
-    else:
-        score_p = 0  # 無趨勢直接不符合
-
-    # 條件2：支撐不破（收盤 > 20MA，未跌破前波低點）
-    if support_hold:
-        score_p += 25
-        sigs_p.append("型態")
-
-    # 條件3：過昨日最高點（確認反彈啟動）—— 核心條件
-    if over_prev_h:
-        score_p += 20
-
-    # 條件4：量縮回檔後今日放量（回檔量縮 + 今日量增）
-    vol_ma5_prev = df["volume"].iloc[-6:-1].mean()
-    vol_shrink   = vol_ma5_prev < vol_ma20 * 0.8
-    vol_expand   = latest["volume"] > vol_ma5_prev
-    if vol_shrink and vol_expand:
-        score_p += 15
-        sigs_p.append("籌碼")
-    elif vol_shrink:
-        score_p += 8
-
-    # 條件5：5日動能轉正
-    if mom5 >= 1:
-        score_p += 10
-        sigs_p.append("動能")
-    elif mom5 > 0:
-        score_p += 5
-
-    # 回後買上漲必要條件：有趨勢 + 支撐不破 + 過昨高 + 爆量 ≥ 1.2x
-    pullback_valid = (ma_bull3 and support_hold and over_prev_h and vol_ratio_prev >= 1.2)
-
-    # ═══════════════════════════════════════
-    #  系統三：強勢上漲評分（滿分100）
-    # ═══════════════════════════════════════
-    score_s  = 0
-    sigs_s   = []
-
-    # 條件1：近一月新高（強勢確認）—— 核心條件
-    high20_days = df["close"].iloc[-21:-1].max()
-    is_new_high = latest["close"] > high20_days
-    if is_new_high:
-        score_s += 35
-        sigs_s.append("型態")
-
-    # 條件2：均線多頭排列 —— 核心條件
-    if ma_bull4:
-        score_s += 30
-        sigs_s.append("趨勢")
-    elif ma_bull3:
-        score_s += 20
-        sigs_s.append("趨勢")
-    else:
-        score_s = 0
-
-    # 條件3：過昨日最高點（確認今日強勢）
-    if over_prev_h:
-        score_s += 15
-
-    # 條件4：爆量 ≥ 1.2x（主力參與）
-    if vol_ratio >= 1.5:
-        score_s += 20
-        sigs_s.append("籌碼")
-    elif vol_ratio >= 1.2:
-        score_s += 15
-        sigs_s.append("籌碼")
-
-    # 條件5：股價創新高且量能配合
-    if is_new_high and vol_ratio >= 1.2:
-        score_s += 10
-
-    # 條件6：5日動能轉正
-    if mom5 >= 1:
-        score_s += 10
-        sigs_s.append("動能")
-    elif mom5 > 0:
-        score_s += 5
-
-    # 強勢大型股必要條件：創新高 + 有趨勢 + 過昨高 + 爆量 ≥ 1.2x
-    strong_valid = (is_new_high and ma_bull3 and over_prev_h and vol_ratio_prev >= 1.2)
-
-    # ═══════════════════════════════════════
-    #  系統四：題材熱股評分（滿分100）
-    # ═══════════════════════════════════════
-    score_t  = 0
-    sigs_t   = []
-
-    # 由 run_screener 傳入當日熱門產業
-    # 條件1：符合熱門題材 —— 核心條件
-    if hot_industries:
-        score_t += 40
-        sigs_t.append("題材")
     
-    # 條件2：三線多排 —— 核心條件
-    if ma_bull3:
-        score_t += 25
-        sigs_t.append("趨勢")
-    else:
-        score_t = 0
-
-    # 條件3：爆量 ≥ 1.2x（題材個股需要量能確認）
-    if vol_ratio >= 1.2:
-        score_t += 20
-        sigs_t.append("籌碼")
-
-    # 條件4：過昨日最高點（短期強勢）
-    if over_prev_h:
-        score_t += 10
-
-    # 條件5：5日動能轉正
-    if mom5 >= 1:
-        score_t += 10
-        sigs_t.append("動能")
-    elif mom5 > 0:
-        score_t += 5
-
-    # 題材熱股必要條件：符合熱門題材 + 三線多排 + 爆量≥1.2x（昨日量倍數）
-    theme_valid = (hot_industries and ma_bull3 and vol_ratio_prev >= 1.2)
-
+    # ═══════════════════════════════════════
+    #  系統二：回後買上漲（必備 5 條件）
+    # ═══════════════════════════════════════
+    score_p = 0
+    sigs_p = []
+    
+    # 支撐不破（20MA）
+    support_hold = price > ma20
+    
+    # 必備條件檢查
+    p1 = vol_reduced  # 近 5 日量縮
+    p2 = vol_ratio_5d >= 1.0  # 今日量 > 5日均量
+    p3 = ma_bull3
+    p4 = support_hold
+    p5 = over_prev_h
+    p6 = vol_ratio_prev >= 1.2  # 今日量 > 昨日量 × 1.2
+    
+    pullback_valid = p1 and p2 and p3 and p4 and p5 and p6
+    
+    if pullback_valid:
+        score_p = 100
+        sigs_p = ["型態", "籌碼", "趨勢"]
+    
+    # ═══════════════════════════════════════
+    #  系統三：強勢上漲（必備 5 條件）
+    # ═══════════════════════════════════════
+    score_s = 0
+    sigs_s = []
+    
+    # 必備條件檢查
+    s1 = is_new_high_20
+    s2 = ma_bull3
+    s3 = vol_ratio_20d >= 1.5  # 爆量 ≥ 1.5x
+    s4 = over_prev_h
+    s5 = vol_ratio_prev >= 1.0  # 今日量 > 昨日量
+    
+    strong_valid = s1 and s2 and s3 and s4 and s5
+    
+    if strong_valid:
+        score_s = 100
+        sigs_s = ["型態", "籌碼", "趨勢"]
+    
+    # ═══════════════════════════════════════
+    #  系統四：題材熱股（必備 6 條件）
+    # ═══════════════════════════════════════
+    score_t = 0
+    sigs_t = []
+    
+    # 必備條件檢查
+    t1 = False  # hot_industries 在主函數中判定
+    t2 = ma_bull3
+    t3 = vol_ratio_20d >= 1.5  # 爆量 ≥ 1.5x
+    t4 = over_prev_h
+    t5 = vol_ratio_prev >= 1.0  # 今日量 > 昨日量
+    t6 = is_new_high_20  # 創新高確認
+    
+    theme_valid = t1 and t2 and t3 and t4 and t5 and t6  # t1 需要外部判定
+    
+    if theme_valid:
+        score_t = 100
+        sigs_t = ["型態", "籌碼", "趨勢", "題材"]
+    
     # ═══════════════════════════════════════
     #  決定最終結果
     # ═══════════════════════════════════════
-    MIN_SCORE = CRITERIA["min_score"]
-
-    result_entry  = None
-    result_score  = 0
-    result_sigs   = []
-
-    if breakout_valid and score_b >= MIN_SCORE:
+    if breakout_valid and score_b >= 65:
         result_entry = "盤整突破"
-        result_score = min(score_b, 100)
-        result_sigs  = sigs_b
-    elif pullback_valid and score_p >= MIN_SCORE:
+        result_score = score_b
+        result_sigs = sigs_b
+    elif pullback_valid and score_p >= 65:
         result_entry = "回後買上漲"
-        result_score = min(score_p, 100)
-        result_sigs  = sigs_p
+        result_score = score_p
+        result_sigs = sigs_p
     elif strong_valid and score_s >= 60:
         result_entry = "強勢上漲"
-        result_score = min(score_s, 100)
-        result_sigs  = sigs_s
+        result_score = score_s
+        result_sigs = sigs_s
     elif theme_valid and score_t >= 55:
         result_entry = "題材熱股"
-        result_score = min(score_t, 100)
-        result_sigs  = sigs_t
+        result_score = score_t
+        result_sigs = sigs_t
     else:
         return None
-
-    chg = (latest["close"] / prev["close"] - 1) * 100 if prev["close"] > 0 else 0
-
-    # 計算5日均價
-    avg_price_5d = df["close"].iloc[-6:-1].mean() if len(df) >= 6 else latest["close"]
     
     return {
-        "code"              : stock_id,
-        "price"             : round(float(latest["close"]), 1),
-        "chg"               : round(chg, 2),
-        "score"             : result_score,
-        "signals"           : list(dict.fromkeys(result_sigs)),
-        "consolidation_days": int(consolidation_days),
-        "vol_ratio"         : round(vol_ratio, 2),
-        "momentum_5d"       : round(mom5, 2),
-        "entry"             : result_entry,
-        "ma_bull4"          : bool(ma_bull4),
-        "prev_close"        : round(float(prev["close"]), 1),
-        "prev_vol"          : int(prev_vol),
-        "volume"            : int(latest["volume"]),
-        "avg_price_5d"      : round(avg_price_5d, 1),
-        "upper_shadow_pct"  : round(upper_shadow_pct, 2),
-        "vol_ma5"           : round(vol_ma5, 0),
-        "details"           : {
-            "breakout"      : bool(is_breakout),
-            "over_prev_high": bool(over_prev_h),
-            "support_hold"  : bool(support_hold),
-            "pullback_pct"  : round(pullback_pct, 2),
-            "body_pct"      : round(body_pct, 2),
-        }
+        "code": stock_id,
+        "name": stock_name,
+        "price": round(price, 1),
+        "chg": round(chg, 2),
+        "score": result_score,
+        "signals": list(dict.fromkeys(result_sigs)),
+        "entry": result_entry,
+        "prev_close": round(prev_close, 1),
+        "prev_vol": int(prev_vol),
+        "volume": int(vol),
+        "avg_price_5d": round(avg_price_5d, 1),
+        "upper_shadow_pct": round(upper_shadow_pct, 2),
+        "vol_ma5": round(vol_ma5, 0),
     }
 
-
-def run_screener(date: str = None, max_workers: int = 3) -> list[dict]:
-    if date is None:
-        date = datetime.today().strftime("%Y-%m-%d")
-
-    # 取得股票清單
+def run_screener(date=None, max_workers=3):
+    today = date or datetime.today().strftime("%Y-%m-%d")
+    log.info(f"開始掃描 {today}")
+    
     universe = get_stock_universe()
     if universe.empty:
-        log.error("無法取得股票清單，終止")
+        log.error("❌ 無法取得股票清單")
         return []
-
-    stock_ids = universe["stock_id"].tolist()
-
-    # 建立代號→產業對照
-    industry_lookup = {}
-    name_lookup     = {}
-    if "industry_category" in universe.columns:
-        for _, row in universe.iterrows():
-            sid = row["stock_id"]
-            industry_lookup[sid] = classify_industry(str(row.get("industry_category", "")))
-            name_lookup[sid]     = str(row.get("stock_name", sid))
-
-    # 動態偵測熱門產業：統計每個產業在全市場的股票數
-    industry_count = Counter(industry_lookup.values())
     
-    # 取出現股數最多的前 3 個產業作為當日熱門題材
-    hot_industries = set([ind for ind, cnt in industry_count.most_common(3)])
-    log.info(f"當日熱門產業: {', '.join([f'{ind}({industry_count[ind]}檔)' for ind in sorted(hot_industries, key=lambda x: industry_count[x], reverse=True)])}")
-
-    log.info(f"開始掃描 {len(stock_ids)} 檔，基準日: {date}")
-    results  = []
-    total    = len(stock_ids)
-    done     = 0
-
-    # 使用 ThreadPoolExecutor 加速
-    def worker(sid):
-        # 判斷該股票是否屬於熱門產業
-        stock_hot_industries = {industry_lookup.get(sid, "")} if industry_lookup.get(sid, "") in hot_industries else set()
-        result = analyze_stock(sid, date, stock_hot_industries)
-        time.sleep(0.3)
-        return sid, result
-
+    candidates = []
+    seen_codes = set()
+    
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(worker, sid): sid for sid in stock_ids}
-        seen_codes = set()
-        for future in as_completed(futures):
-            done += 1
-            sid, result = future.result()
-            if result and sid not in seen_codes:
-                seen_codes.add(sid)
-                result["industry"] = industry_lookup.get(sid, "其他")
-                result["name"]     = name_lookup.get(sid, sid)
-                result["cap_size"] = classify_market_cap(result["price"])
-                results.append(result)
-            if done % 50 == 0 or done == total:
-                log.info(f"進度: {done}/{total}，目前找到 {len(results)} 檔")
+        futures = []
+        for idx, row in universe.iterrows():
+            stock_id = str(row["stock_id"])
+            if stock_id in seen_codes:
+                continue
+            seen_codes.add(stock_id)
+            
+            stock_name = str(row.get("stock_name", stock_id))
+            industry = classify_industry(row.get("industry_category", ""))
+            
+            future = executor.submit(fetch_stock_data, stock_id, today)
+            futures.append((stock_id, stock_name, industry, future))
+        
+        # 熱門產業偵測
+        all_industries = {}
+        for _, _, ind, _ in futures:
+            all_industries[ind] = all_industries.get(ind, 0) + 1
+        
+        hot_inds = sorted(all_industries.items(), key=lambda x: x[1], reverse=True)[:3]
+        hot_industry_names = [x[0] for x in hot_inds]
+        
+        for i, (stock_id, stock_name, industry, future) in enumerate(futures):
+            df = future.result()
+            if df.empty:
+                continue
+            
+            result = analyze_stock(stock_id, stock_name, industry, df, today)
+            
+            # 題材熱股判定
+            if result and industry in hot_industry_names:
+                if result["entry"] != "題材熱股":
+                    result["entry"] = "題材熱股"
+                    result["signals"].append("題材")
+            
+            if result:
+                candidates.append(result)
+            
+            if (i + 1) % 50 == 0:
+                log.info(f"進度: {i+1}/{len(futures)}，目前找到 {len(candidates)} 檔")
+    
+    candidates.sort(key=lambda x: x["score"], reverse=True)
+    log.info(f"✅ 完成！共 {len(candidates)} 檔候選")
+    return candidates
 
-    results.sort(key=lambda x: x["score"], reverse=True)
-    log.info(f"掃描完成，共 {len(results)} 檔符合條件")
-    return results
-
+def main():
+    today = datetime.today().strftime("%Y-%m-%d")
+    candidates = run_screener(today)
+    with open(f"result_{today}.json", "w", encoding="utf-8") as f:
+        json.dump({"date": today, "candidates": candidates}, f, ensure_ascii=False, indent=2)
+    print(f"✅ 完成！{len(candidates)} 檔")
 
 if __name__ == "__main__":
-    today      = datetime.today().strftime("%Y-%m-%d")
-    candidates = run_screener(today)
-
-    out_path = os.path.join(OUTPUT_DIR, f"result_{today}.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump({"date": today, "candidates": candidates}, f, ensure_ascii=False, indent=2)
-
-    log.info(f"結果儲存: {out_path}")
-    print(f"\n✅ 今日飆股候選：{len(candidates)} 檔")
-    for s in candidates[:20]:
-        print(f"  {s['code']} {s['name']:8s}  評分:{s['score']:3d}  {s['industry']:8s}  {s['cap_size']}  {s['entry']}")
+    main()
