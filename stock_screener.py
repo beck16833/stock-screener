@@ -46,13 +46,21 @@ INDUSTRY_MAP = {
 
 def get_stock_universe():
     try:
-        df = pd.read_csv("https://finmindtrade.com/data/TaiwanStockInfo.csv")
-        df = df[df["market_type"].isin(["上市", "上櫃"])]
-        df = df.drop_duplicates(subset=["stock_id"])
-        return df
+        params = {
+            "dataset": "TaiwanStockInfo",
+            "token": os.getenv("FINMIND_TOKEN", "")
+        }
+        r = requests.get(BASE_URL, params=params, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("data"):
+                df = pd.DataFrame(data["data"])
+                df = df[df["market_type"].isin(["上市", "上櫃"])]
+                df = df.drop_duplicates(subset=["stock_id"])
+                return df
     except Exception as e:
         log.error(f"❌ 取得股票清單失敗: {e}")
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 def classify_industry(cat):
     for key, val in INDUSTRY_MAP.items():
