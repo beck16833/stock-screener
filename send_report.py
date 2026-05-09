@@ -75,6 +75,15 @@ td{{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}}
 </header>
 <main>
 <div class="filter-panel">
+  <div style="background:rgba(252,141,129,.1);border:1px solid rgba(252,141,129,.3);border-radius:4px;padding:14px;margin-bottom:20px">
+    <div style="font-size:12px;font-weight:700;color:#fc8181;margin-bottom:8px">📌 操作指引（散戶護身符）</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.8">
+      ✅ <strong>買進訊號：</strong> 股價站上 5MA（五軍），搭配量能確認<br>
+      ❌ <strong>賣出訊號：</strong> 跌破 5MA（五軍），或頭頭低（新高失守）<br>
+      ⚠️ <strong>風險控制：</strong> 遵守進場條件，不追高，保護資金最重要
+    </div>
+  </div>
+  
   <div class="filters-grid">
     <div>
       <label style="font-size:11px;color:var(--muted)">進場策略</label>
@@ -124,6 +133,8 @@ td{{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}}
       <th>上影線%</th>
       <th>量比(5日)</th>
       <th>量比(昨日)</th>
+      <th onclick="sortBy('ma20_trend',this)">20MA趨勢</th>
+      <th onclick="sortBy('consolidation_days',this)">地基天數</th>
       <th onclick="sortBy('score',this)">評分</th>
       <th>訊號</th>
       <th>進場策略</th>
@@ -163,7 +174,7 @@ function render() {{
   const tbody = document.getElementById('tbody');
   
   if(!data.length) {{
-    tbody.innerHTML = '<tr><td colspan="14" class="empty">無符合條件的標的</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" class="empty">無符合條件的標的</td></tr>';
     return;
   }}
   
@@ -186,7 +197,9 @@ function render() {{
       <td class="${{chgClass}}">${{chgStr}}</td>
       <td>${{s.upper_shadow_pct.toFixed(2)}}%</td>
       <td class="${{vol_ratio_5d >= 1.0 ? 'ok' : 'ng'}}">${{vol_ratio_5d}}</td>
-      <td class="${{vol_ratio_prev >= 1.2 ? 'ok' : 'ng'}}">${{vol_ratio_prev}}</td>
+      <td class="${{vol_ratio_prev >= 1.5 ? 'ok' : 'ng'}}">${{vol_ratio_prev}}</td>
+      <td style="color:${{s.ma20_trend==='上彎'?'#68d391':s.ma20_trend==='下彎'?'#fc8181':'#718096'}};font-weight:600">${{s.ma20_trend}}</td>
+      <td><strong>${{s.consolidation_days}}</strong>天</td>
       <td><strong>${{s.score}}</strong></td>
       <td>${{sigs}}</td>
       <td>${{s.entry}}</td>
