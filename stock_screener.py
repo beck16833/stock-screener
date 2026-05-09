@@ -159,7 +159,7 @@ def analyze_stock(stock_id, stock_name, industry, df, date):
     result_entry = None
     
     # ═══════════════════════════════════════
-    #  系統一：盤整突破（必備 5 條件）
+    #  系統一：盤整突破（必備 4 條件）
     # ═══════════════════════════════════════
     score_b = 0
     sigs_b = []
@@ -169,13 +169,20 @@ def analyze_stock(stock_id, stock_name, industry, df, date):
     b2 = ma_bull3
     b3 = over_prev_h
     b4 = vol_ratio_prev >= 1.0  # 今日量 > 昨日量
-    b5 = upper_shadow_pct < 3.0  # 上影線 < 3%
     
-    breakout_valid = b1 and b2 and b3 and b4 and b5
+    breakout_valid = b1 and b2 and b3 and b4
     
     if breakout_valid:
-        score_b = 100
+        score_b = 85  # 基礎分數
         sigs_b = ["型態", "籌碼", "趨勢"]
+        
+        # 加分條件
+        if vol_ratio_prev >= 1.5:
+            score_b += 10
+        if upper_shadow_pct < 2.0:
+            score_b = min(score_b + 5, 100)
+        if vol_ratio_5d >= 1.5:
+            score_b = min(score_b + 5, 100)
     
     # ═══════════════════════════════════════
     #  系統二：回後買上漲（必備 5 條件）
@@ -186,19 +193,27 @@ def analyze_stock(stock_id, stock_name, industry, df, date):
     # 支撐不破（20MA）
     support_hold = price > ma20
     
-    # 必備條件檢查
-    p1 = vol_reduced  # 近 5 日量縮
-    p2 = vol_ratio_5d >= 1.0  # 今日量 > 5日均量
+    # 必備條件檢查（寬鬆量縮：近 10 日有量縮跡象）
+    vol_ma10 = df["volume"].iloc[-11:-1].mean() if len(df) >= 11 else df["volume"].mean()
+    vol_reduced_loose = vol_ma5 < vol_ma20 * 0.85  # 5日均量 < 20日均量 85%
+    
+    p1 = vol_reduced_loose  # 近期有量縮跡象
+    p2 = vol_ratio_prev >= 1.0  # 今日量 > 昨日量
     p3 = ma_bull3
     p4 = support_hold
     p5 = over_prev_h
-    p6 = vol_ratio_prev >= 1.2  # 今日量 > 昨日量 × 1.2
     
-    pullback_valid = p1 and p2 and p3 and p4 and p5 and p6
+    pullback_valid = p1 and p2 and p3 and p4 and p5
     
     if pullback_valid:
-        score_p = 100
+        score_p = 85  # 基礎分數
         sigs_p = ["型態", "籌碼", "趨勢"]
+        
+        # 加分條件
+        if vol_ratio_prev >= 1.2:
+            score_p += 10
+        if vol_ratio_5d >= 1.3:
+            score_p = min(score_p + 5, 100)
     
     # ═══════════════════════════════════════
     #  系統三：強勢上漲（必備 5 條件）
