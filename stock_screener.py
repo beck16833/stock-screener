@@ -148,11 +148,29 @@ def analyze_stock(stock_id, stock_name, industry, df, date):
     # 20日均量
     vol_ratio_20d = vol / vol_ma20 if vol_ma20 > 0 else 0
     
-    # 動能
-    mom5 = ((price / df.iloc[-6]["close"] - 1) * 100) if len(df) >= 6 and df.iloc[-6]["close"] > 0 else 0
+    # 20MA 趨勢判定（上彎/下彎）
+    ma20_today = df["close"].iloc[-21:-1].mean() if len(df) >= 21 else ma20
+    ma20_5d_ago = df["close"].iloc[-26:-6].mean() if len(df) >= 26 else ma20
+    ma20_10d_ago = df["close"].iloc[-31:-11].mean() if len(df) >= 31 else ma20
     
-    # 熱門產業（動態偵測）
-    hot_industries = []  # 在 run_screener 中動態生成
+    # 判定 20MA 走勢
+    if ma20_today > ma20_5d_ago > ma20_10d_ago:
+        ma20_trend = "上彎"  # 20MA 持續上升 = 上彎
+    elif ma20_today < ma20_5d_ago < ma20_10d_ago:
+        ma20_trend = "下彎"  # 20MA 持續下降 = 下彎
+    else:
+        ma20_trend = "震盪"  # 其他情況 = 震盪
+    
+    # 地基天數計算（股價在中位數±5% 區間維持的天數）
+    mid_price = (df["close"].max() + df["close"].min()) / 2
+    consolidation_range = mid_price * 0.05  # ±5% 範圍
+    consolidation_days = 0
+    
+    for i in range(len(df) - 1, -1, -1):
+        if abs(df.iloc[i]["close"] - mid_price) <= consolidation_range:
+            consolidation_days += 1
+        else:
+            break
     
     result_score = 0
     result_sigs = []
@@ -277,6 +295,8 @@ def analyze_stock(stock_id, stock_name, industry, df, date):
         "avg_price_5d": round(avg_price_5d, 1),
         "upper_shadow_pct": round(upper_shadow_pct, 2),
         "vol_ma5": round(vol_ma5, 0),
+        "ma20_trend": ma20_trend,
+        "consolidation_days": int(consolidation_days),
     }
 
 def run_screener(date=None, max_workers=3):
