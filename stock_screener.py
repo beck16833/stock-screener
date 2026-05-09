@@ -55,7 +55,7 @@ def get_stock_universe():
             data = r.json()
             if data.get("data"):
                 df = pd.DataFrame(data["data"])
-                df = df[df["market_type"].isin(["上市", "上櫃"])]
+                # 不篩選 market_type，直接使用所有股票
                 df = df.drop_duplicates(subset=["stock_id"])
                 return df
     except Exception as e:
