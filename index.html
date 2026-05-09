@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 2026-05-08</title>
+<title>飆股雷達 2026-05-09</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}
@@ -41,7 +41,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-05-08（週五） • 0 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-05-09（週六） • 4 檔</div>
 </header>
 <main>
 <div class="filter-panel">
@@ -104,7 +104,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [];
+const ALL = [{"code": "2727", "name": "王品", "price": 234.5, "chg": 1.52, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "盤整突破", "prev_close": 231.0, "prev_vol": 620756, "volume": 1561030, "avg_price_5d": 229.3, "upper_shadow_pct": 1.71, "vol_ma5": 389041.0}, {"code": "1598", "name": "岱宇", "price": 22.2, "chg": 6.73, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 20.8, "prev_vol": 450412, "volume": 1373029, "avg_price_5d": 20.7, "upper_shadow_pct": 1.35, "vol_ma5": 427224.0}, {"code": "6757", "name": "台灣虎航-創", "price": 57.0, "chg": 3.26, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 55.2, "prev_vol": 4383483, "volume": 7144245, "avg_price_5d": 51.2, "upper_shadow_pct": 5.26, "vol_ma5": 1721981.0}, {"code": "4749", "name": "新應材", "price": 1085.0, "chg": 9.93, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 987.0, "prev_vol": 3245026, "volume": 6656252, "avg_price_5d": 1002.6, "upper_shadow_pct": 0.0, "vol_ma5": 3724728.0}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function getFiltered() {
