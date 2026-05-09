@@ -41,10 +41,19 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-05-09（週六） • 4 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-05-09（週六） • 3 檔</div>
 </header>
 <main>
 <div class="filter-panel">
+  <div style="background:rgba(252,141,129,.1);border:1px solid rgba(252,141,129,.3);border-radius:4px;padding:14px;margin-bottom:20px">
+    <div style="font-size:12px;font-weight:700;color:#fc8181;margin-bottom:8px">📌 操作指引（散戶護身符）</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.8">
+      ✅ <strong>買進訊號：</strong> 股價站上 5MA（五軍），搭配量能確認<br>
+      ❌ <strong>賣出訊號：</strong> 跌破 5MA（五軍），或頭頭低（新高失守）<br>
+      ⚠️ <strong>風險控制：</strong> 遵守進場條件，不追高，保護資金最重要
+    </div>
+  </div>
+  
   <div class="filters-grid">
     <div>
       <label style="font-size:11px;color:var(--muted)">進場策略</label>
@@ -94,6 +103,8 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
       <th>上影線%</th>
       <th>量比(5日)</th>
       <th>量比(昨日)</th>
+      <th onclick="sortBy('ma20_trend',this)">20MA趨勢</th>
+      <th onclick="sortBy('consolidation_days',this)">地基天數</th>
       <th onclick="sortBy('score',this)">評分</th>
       <th>訊號</th>
       <th>進場策略</th>
@@ -104,7 +115,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [{"code": "2727", "name": "王品", "price": 234.5, "chg": 1.52, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "盤整突破", "prev_close": 231.0, "prev_vol": 620756, "volume": 1561030, "avg_price_5d": 229.3, "upper_shadow_pct": 1.71, "vol_ma5": 389041.0}, {"code": "1598", "name": "岱宇", "price": 22.2, "chg": 6.73, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 20.8, "prev_vol": 450412, "volume": 1373029, "avg_price_5d": 20.7, "upper_shadow_pct": 1.35, "vol_ma5": 427224.0}, {"code": "6757", "name": "台灣虎航-創", "price": 57.0, "chg": 3.26, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 55.2, "prev_vol": 4383483, "volume": 7144245, "avg_price_5d": 51.2, "upper_shadow_pct": 5.26, "vol_ma5": 1721981.0}, {"code": "4749", "name": "新應材", "price": 1085.0, "chg": 9.93, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 987.0, "prev_vol": 3245026, "volume": 6656252, "avg_price_5d": 1002.6, "upper_shadow_pct": 0.0, "vol_ma5": 3724728.0}];
+const ALL = [{"code": "2727", "name": "王品", "price": 234.5, "chg": 1.52, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "盤整突破", "prev_close": 231.0, "prev_vol": 620756, "volume": 1561030, "avg_price_5d": 229.3, "upper_shadow_pct": 1.71, "vol_ma5": 389041.0, "ma20_trend": "震盪", "consolidation_days": 29}, {"code": "1598", "name": "岱宇", "price": 22.2, "chg": 6.73, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 20.8, "prev_vol": 450412, "volume": 1373029, "avg_price_5d": 20.7, "upper_shadow_pct": 1.35, "vol_ma5": 427224.0, "ma20_trend": "上彎", "consolidation_days": 8}, {"code": "6757", "name": "台灣虎航-創", "price": 57.0, "chg": 3.26, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 55.2, "prev_vol": 4383483, "volume": 7144245, "avg_price_5d": 51.2, "upper_shadow_pct": 5.26, "vol_ma5": 1721981.0, "ma20_trend": "震盪", "consolidation_days": 0}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function getFiltered() {
@@ -133,7 +144,7 @@ function render() {
   const tbody = document.getElementById('tbody');
   
   if(!data.length) {
-    tbody.innerHTML = '<tr><td colspan="14" class="empty">無符合條件的標的</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" class="empty">無符合條件的標的</td></tr>';
     return;
   }
   
@@ -156,7 +167,9 @@ function render() {
       <td class="${chgClass}">${chgStr}</td>
       <td>${s.upper_shadow_pct.toFixed(2)}%</td>
       <td class="${vol_ratio_5d >= 1.0 ? 'ok' : 'ng'}">${vol_ratio_5d}</td>
-      <td class="${vol_ratio_prev >= 1.2 ? 'ok' : 'ng'}">${vol_ratio_prev}</td>
+      <td class="${vol_ratio_prev >= 1.5 ? 'ok' : 'ng'}">${vol_ratio_prev}</td>
+      <td style="color:${s.ma20_trend==='上彎'?'#68d391':s.ma20_trend==='下彎'?'#fc8181':'#718096'};font-weight:600">${s.ma20_trend}</td>
+      <td><strong>${s.consolidation_days}</strong>天</td>
       <td><strong>${s.score}</strong></td>
       <td>${sigs}</td>
       <td>${s.entry}</td>
