@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 2026-05-28</title>
+<title>飆股雷達 2026-05-29</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}
@@ -41,7 +41,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-05-28（週四） • 3 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-05-29（週五） • 4 檔</div>
 </header>
 <main>
 <div class="filter-panel">
@@ -115,7 +115,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [{"code": "3687", "name": "歐買尬", "price": 71.5, "chg": 5.93, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 67.5, "prev_vol": 98570, "volume": 561694, "avg_price_5d": 68.6, "upper_shadow_pct": 1.68, "vol_ma5": 201214.0, "ma20_trend": "震盪", "consolidation_days": 1}, {"code": "8473", "name": "山林水", "price": 46.0, "chg": 7.23, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 42.9, "prev_vol": 2053236, "volume": 4176058, "avg_price_5d": 41.5, "upper_shadow_pct": 2.18, "vol_ma5": 2325216.0, "ma20_trend": "震盪", "consolidation_days": 0}, {"code": "1563", "name": "巧新", "price": 61.1, "chg": 9.89, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 55.6, "prev_vol": 1389402, "volume": 4815581, "avg_price_5d": 48.8, "upper_shadow_pct": 0.0, "vol_ma5": 1058691.0, "ma20_trend": "上彎", "consolidation_days": 0}];
+const ALL = [{"code": "3687", "name": "歐買尬", "price": 73.9, "chg": 3.36, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 71.5, "prev_vol": 561694, "volume": 733980, "avg_price_5d": 68.8, "upper_shadow_pct": 1.08, "vol_ma5": 216483.0, "ma20_trend": "震盪", "consolidation_days": 2}, {"code": "8473", "name": "山林水", "price": 50.4, "chg": 9.68, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 46.0, "prev_vol": 4176058, "volume": 6820723, "avg_price_5d": 42.5, "upper_shadow_pct": 0.2, "vol_ma5": 2301373.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "8454", "name": "富邦媒", "price": 231.0, "chg": 10.0, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "強勢上漲", "prev_close": 210.0, "prev_vol": 2765166, "volume": 3691482, "avg_price_5d": 193.7, "upper_shadow_pct": 0.0, "vol_ma5": 1093809.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "1563", "name": "巧新", "price": 66.7, "chg": 9.17, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 61.1, "prev_vol": 4815581, "volume": 14824089, "avg_price_5d": 51.9, "upper_shadow_pct": 0.75, "vol_ma5": 1866980.0, "ma20_trend": "上彎", "consolidation_days": 0}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function getFiltered() {
