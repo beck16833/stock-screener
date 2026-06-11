@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 2026-06-10</title>
+<title>飆股雷達 2026-06-11</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}
@@ -41,7 +41,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-06-10（週三） • 5 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-06-11（週四） • 4 檔</div>
 </header>
 <main>
 <div class="filter-panel">
@@ -115,7 +115,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [{"code": "5345", "name": "天揚", "price": 32.1, "chg": 9.91, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 29.2, "prev_vol": 65785, "volume": 501828, "avg_price_5d": 24.9, "upper_shadow_pct": 0.0, "vol_ma5": 50760.0, "ma20_trend": "震盪", "consolidation_days": 0}, {"code": "8454", "name": "富邦媒", "price": 449.5, "chg": 5.39, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "強勢上漲", "prev_close": 426.5, "prev_vol": 3503276, "volume": 4053663, "avg_price_5d": 356.1, "upper_shadow_pct": 3.89, "vol_ma5": 5228728.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "9910", "name": "豐泰", "price": 94.0, "chg": 8.92, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 86.3, "prev_vol": 9599573, "volume": 15574148, "avg_price_5d": 80.9, "upper_shadow_pct": 0.0, "vol_ma5": 11277495.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "8422", "name": "可寧衛", "price": 30.2, "chg": 2.2, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 29.6, "prev_vol": 23215533, "volume": 91841488, "avg_price_5d": 28.2, "upper_shadow_pct": 4.63, "vol_ma5": 16217925.0, "ma20_trend": "震盪", "consolidation_days": 0}, {"code": "8478", "name": "東哥遊艇", "price": 166.0, "chg": 2.79, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 161.5, "prev_vol": 201726, "volume": 618186, "avg_price_5d": 160.1, "upper_shadow_pct": 3.01, "vol_ma5": 381266.0, "ma20_trend": "下彎", "consolidation_days": 0}];
+const ALL = [{"code": "5345", "name": "天揚", "price": 35.4, "chg": 9.95, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 32.1, "prev_vol": 501828, "volume": 709838, "avg_price_5d": 26.8, "upper_shadow_pct": 0.0, "vol_ma5": 143660.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "2723", "name": "美食-KY", "price": 68.3, "chg": 6.72, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "盤整突破", "prev_close": 64.0, "prev_vol": 401887, "volume": 1331548, "avg_price_5d": 63.6, "upper_shadow_pct": 1.9, "vol_ma5": 324022.0, "ma20_trend": "下彎", "consolidation_days": 1}, {"code": "9914", "name": "美利達", "price": 73.7, "chg": 6.81, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 69.0, "prev_vol": 1220768, "volume": 4794831, "avg_price_5d": 68.7, "upper_shadow_pct": 2.44, "vol_ma5": 1295708.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "9910", "name": "豐泰", "price": 97.0, "chg": 3.19, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 94.0, "prev_vol": 15574148, "volume": 15982996, "avg_price_5d": 83.2, "upper_shadow_pct": 2.06, "vol_ma5": 11549024.0, "ma20_trend": "上彎", "consolidation_days": 1}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function getFiltered() {
