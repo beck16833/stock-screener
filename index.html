@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 2026-06-12</title>
+<title>飆股雷達 2026-06-15</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}
@@ -41,7 +41,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-06-12（週五） • 6 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-06-15（週一） • 2 檔</div>
 </header>
 <main>
 <div class="filter-panel">
@@ -115,7 +115,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [{"code": "2753", "name": "八方雲集", "price": 190.5, "chg": 2.42, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "盤整突破", "prev_close": 186.0, "prev_vol": 340629, "volume": 737700, "avg_price_5d": 183.1, "upper_shadow_pct": 0.26, "vol_ma5": 383980.0, "ma20_trend": "震盪", "consolidation_days": 3}, {"code": "5904", "name": "寶雅", "price": 647.0, "chg": 3.52, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "強勢上漲", "prev_close": 625.0, "prev_vol": 741585, "volume": 1206420, "avg_price_5d": 601.6, "upper_shadow_pct": 2.63, "vol_ma5": 694239.0, "ma20_trend": "震盪", "consolidation_days": 0}, {"code": "5306", "name": "桂盟", "price": 88.5, "chg": 3.87, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 85.2, "prev_vol": 201143, "volume": 575628, "avg_price_5d": 84.6, "upper_shadow_pct": 0.11, "vol_ma5": 207232.0, "ma20_trend": "上彎", "consolidation_days": 4}, {"code": "6153", "name": "嘉聯益", "price": 22.2, "chg": 9.61, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 20.3, "prev_vol": 15778571, "volume": 28664631, "avg_price_5d": 20.1, "upper_shadow_pct": 0.22, "vol_ma5": 25558077.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "6465", "name": "威潤", "price": 60.9, "chg": 9.93, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 55.4, "prev_vol": 976226, "volume": 1399534, "avg_price_5d": 52.7, "upper_shadow_pct": 0.0, "vol_ma5": 667913.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "6409", "name": "旭隼", "price": 930.0, "chg": 9.93, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 846.0, "prev_vol": 977713, "volume": 1641731, "avg_price_5d": 888.8, "upper_shadow_pct": 0.0, "vol_ma5": 2851305.0, "ma20_trend": "震盪", "consolidation_days": 1}];
+const ALL = [{"code": "5278", "name": "尚凡", "price": 25.6, "chg": 5.14, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 24.3, "prev_vol": 297549, "volume": 763590, "avg_price_5d": 24.0, "upper_shadow_pct": 1.37, "vol_ma5": 371460.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "6472", "name": "保瑞", "price": 410.0, "chg": 4.99, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "盤整突破", "prev_close": 390.5, "prev_vol": 706145, "volume": 1958717, "avg_price_5d": 390.0, "upper_shadow_pct": 1.59, "vol_ma5": 2354566.0, "ma20_trend": "震盪", "consolidation_days": 0}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function getFiltered() {
