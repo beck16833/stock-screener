@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 2026-08-11</title>
+<title>飆股雷達 2026-08-12</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}
@@ -41,7 +41,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-08-11（週二） • 0 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-08-12（週三） • 2 檔</div>
 </header>
 <main>
 <div class="filter-panel">
@@ -115,7 +115,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [];
+const ALL = [{"code": "6913", "name": "鴻呈", "price": 150.0, "chg": 2.04, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 147.0, "prev_vol": 468245, "volume": 1042154, "avg_price_5d": 140.9, "upper_shadow_pct": 1.0, "vol_ma5": 971739.0, "ma20_trend": "震盪", "consolidation_days": 0}, {"code": "6588", "name": "東典光電", "price": 97.1, "chg": 9.97, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 88.3, "prev_vol": 716794, "volume": 1867634, "avg_price_5d": 91.3, "upper_shadow_pct": 0.0, "vol_ma5": 2089706.0, "ma20_trend": "上彎", "consolidation_days": 1}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function getFiltered() {
