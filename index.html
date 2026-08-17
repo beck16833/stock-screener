@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 2026-08-14</title>
+<title>飆股雷達 2026-08-17</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}
@@ -41,7 +41,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-08-14（週五） • 0 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-08-17（週一） • 3 檔</div>
 </header>
 <main>
 <div class="filter-panel">
@@ -115,7 +115,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [];
+const ALL = [{"code": "5321", "name": "美而快", "price": 68.0, "chg": 6.92, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 63.6, "prev_vol": 714033, "volume": 1691046, "avg_price_5d": 58.8, "upper_shadow_pct": 2.79, "vol_ma5": 469737.0, "ma20_trend": "震盪", "consolidation_days": 0}, {"code": "4736", "name": "泰博", "price": 143.0, "chg": 2.88, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 139.0, "prev_vol": 441968, "volume": 664692, "avg_price_5d": 135.2, "upper_shadow_pct": 0.0, "vol_ma5": 507297.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "4949", "name": "有成精密", "price": 76.2, "chg": 9.01, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 69.9, "prev_vol": 595515, "volume": 1686060, "avg_price_5d": 71.1, "upper_shadow_pct": 0.66, "vol_ma5": 854307.0, "ma20_trend": "下彎", "consolidation_days": 0}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function getFiltered() {
