@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 2026-08-20</title>
+<title>飆股雷達 2026-08-21</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}
@@ -41,7 +41,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-08-20（週四） • 3 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-08-21（週五） • 3 檔</div>
 </header>
 <main>
 <div class="filter-panel">
@@ -115,7 +115,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [{"code": "6426", "name": "統新", "price": 250.0, "chg": 8.23, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 231.0, "prev_vol": 1990908, "volume": 3573857, "avg_price_5d": 229.9, "upper_shadow_pct": 1.6, "vol_ma5": 1092934.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "2723", "name": "美食-KY", "price": 66.6, "chg": 2.15, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "強勢上漲", "prev_close": 65.2, "prev_vol": 578149, "volume": 621113, "avg_price_5d": 62.7, "upper_shadow_pct": 0.75, "vol_ma5": 486205.0, "ma20_trend": "下彎", "consolidation_days": 2}, {"code": "7751", "name": "竑騰", "price": 1575.0, "chg": 9.76, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 1435.0, "prev_vol": 510072, "volume": 717209, "avg_price_5d": 1442.0, "upper_shadow_pct": 0.0, "vol_ma5": 462339.0, "ma20_trend": "上彎", "consolidation_days": 0}];
+const ALL = [{"code": "2723", "name": "美食-KY", "price": 73.2, "chg": 9.91, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "盤整突破", "prev_close": 66.6, "prev_vol": 621113, "volume": 1644639, "avg_price_5d": 63.8, "upper_shadow_pct": 0.0, "vol_ma5": 536859.0, "ma20_trend": "震盪", "consolidation_days": 0}, {"code": "8473", "name": "山林水", "price": 46.4, "chg": 2.43, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 45.2, "prev_vol": 276163, "volume": 618612, "avg_price_5d": 45.3, "upper_shadow_pct": 0.22, "vol_ma5": 611471.0, "ma20_trend": "震盪", "consolidation_days": 8}, {"code": "4772", "name": "台特化", "price": 256.0, "chg": 2.81, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "回後買上漲", "prev_close": 249.0, "prev_vol": 321962, "volume": 659046, "avg_price_5d": 251.3, "upper_shadow_pct": 0.78, "vol_ma5": 434729.0, "ma20_trend": "震盪", "consolidation_days": 0}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function getFiltered() {
