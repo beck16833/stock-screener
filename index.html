@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 2026-10-02</title>
+<title>飆股雷達 2026-10-05</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}
@@ -41,7 +41,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-10-02（週五） • 7 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-10-05（週一） • 3 檔</div>
 </header>
 <main>
 <div class="filter-panel">
@@ -115,7 +115,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [{"code": "6438", "name": "迅得", "price": 168.0, "chg": 2.13, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 164.5, "prev_vol": 714358, "volume": 1599682, "avg_price_5d": 160.2, "upper_shadow_pct": 1.19, "vol_ma5": 889098.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "2340", "name": "台亞", "price": 45.8, "chg": 4.33, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 43.9, "prev_vol": 40533802, "volume": 41777299, "avg_price_5d": 38.3, "upper_shadow_pct": 3.17, "vol_ma5": 20572754.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "8438", "name": "昶昕", "price": 84.2, "chg": 4.08, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 80.9, "prev_vol": 508451, "volume": 900296, "avg_price_5d": 79.3, "upper_shadow_pct": 0.95, "vol_ma5": 829420.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "3551", "name": "世禾", "price": 199.5, "chg": 3.37, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 193.0, "prev_vol": 1127796, "volume": 3013121, "avg_price_5d": 186.6, "upper_shadow_pct": 1.75, "vol_ma5": 943182.0, "ma20_trend": "上彎", "consolidation_days": 9}, {"code": "8091", "name": "翔名", "price": 237.0, "chg": 9.98, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 215.5, "prev_vol": 148155, "volume": 737989, "avg_price_5d": 217.0, "upper_shadow_pct": 0.0, "vol_ma5": 206324.0, "ma20_trend": "下彎", "consolidation_days": 0}, {"code": "4772", "name": "台特化", "price": 281.5, "chg": 6.43, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "強勢上漲", "prev_close": 264.5, "prev_vol": 964012, "volume": 5856884, "avg_price_5d": 259.6, "upper_shadow_pct": 3.2, "vol_ma5": 1341580.0, "ma20_trend": "下彎", "consolidation_days": 4}, {"code": "7712", "name": "博盛半導體", "price": 170.5, "chg": 0.89, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 169.0, "prev_vol": 370747, "volume": 664439, "avg_price_5d": 164.0, "upper_shadow_pct": 3.23, "vol_ma5": 340941.0, "ma20_trend": "上彎", "consolidation_days": 0}];
+const ALL = [{"code": "5432", "name": "新門", "price": 178.0, "chg": 8.21, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 164.5, "prev_vol": 325124, "volume": 699104, "avg_price_5d": 162.2, "upper_shadow_pct": 0.56, "vol_ma5": 222873.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "8091", "name": "翔名", "price": 240.0, "chg": 1.27, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 237.0, "prev_vol": 737989, "volume": 1812406, "avg_price_5d": 221.2, "upper_shadow_pct": 2.71, "vol_ma5": 320231.0, "ma20_trend": "震盪", "consolidation_days": 0}, {"code": "6903", "name": "巨漢", "price": 328.0, "chg": 3.47, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 317.0, "prev_vol": 224261, "volume": 532058, "avg_price_5d": 312.4, "upper_shadow_pct": 0.3, "vol_ma5": 317903.0, "ma20_trend": "下彎", "consolidation_days": 1}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function getFiltered() {
