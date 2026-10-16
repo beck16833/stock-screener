@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>飆股雷達 2026-10-15</title>
+<title>飆股雷達 2026-10-16</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c0f;--surface:#111418;--surface2:#181c22;--border:#222830;--accent:#f0b429;--text:#e2e8f0;--muted:#718096;}
@@ -41,7 +41,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 <body>
 <header>
   <div class="logo">🎯 飆股雷達</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-10-15（週四） • 7 檔</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px">2026-10-16（週五） • 2 檔</div>
 </header>
 <main>
 <div class="filter-panel">
@@ -115,7 +115,7 @@ td{padding:10px;border-bottom:1px solid rgba(34,40,48,.6)}
 </main>
 
 <script>
-const ALL = [{"code": "2429", "name": "銘旺科", "price": 38.2, "chg": 9.3, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 35.0, "prev_vol": 852894, "volume": 2756838, "avg_price_5d": 32.0, "upper_shadow_pct": 0.52, "vol_ma5": 772755.0, "ma20_trend": "震盪", "consolidation_days": 0}, {"code": "6869", "name": "雲豹能源-創", "price": 71.1, "chg": 1.28, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 70.2, "prev_vol": 286837, "volume": 677678, "avg_price_5d": 70.3, "upper_shadow_pct": 0.84, "vol_ma5": 277108.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "2727", "name": "王品", "price": 246.0, "chg": 1.65, "score": 100, "signals": ["型態", "籌碼", "趨勢"], "entry": "盤整突破", "prev_close": 242.0, "prev_vol": 205579, "volume": 1121242, "avg_price_5d": 238.9, "upper_shadow_pct": 0.81, "vol_ma5": 371039.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "9904", "name": "寶成", "price": 26.2, "chg": 0.57, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 26.1, "prev_vol": 15803655, "volume": 21446343, "avg_price_5d": 25.5, "upper_shadow_pct": 0.0, "vol_ma5": 17815130.0, "ma20_trend": "震盪", "consolidation_days": 2}, {"code": "9921", "name": "巨大", "price": 93.4, "chg": 1.41, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 92.1, "prev_vol": 668107, "volume": 2172857, "avg_price_5d": 92.3, "upper_shadow_pct": 2.68, "vol_ma5": 897873.0, "ma20_trend": "下彎", "consolidation_days": 0}, {"code": "6446", "name": "藥華藥", "price": 1205.0, "chg": 1.26, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 1190.0, "prev_vol": 1109339, "volume": 3326931, "avg_price_5d": 1188.0, "upper_shadow_pct": 2.9, "vol_ma5": 1315726.0, "ma20_trend": "下彎", "consolidation_days": 0}, {"code": "00864B", "name": "中信美國公債0-1", "price": 47.0, "chg": 0.47, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 46.7, "prev_vol": 872080, "volume": 1934067, "avg_price_5d": 46.4, "upper_shadow_pct": 0.04, "vol_ma5": 824850.0, "ma20_trend": "上彎", "consolidation_days": 163}];
+const ALL = [{"code": "8476", "name": "台境", "price": 21.5, "chg": 3.37, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 20.8, "prev_vol": 297250, "volume": 534057, "avg_price_5d": 21.1, "upper_shadow_pct": 0.7, "vol_ma5": 372529.0, "ma20_trend": "上彎", "consolidation_days": 0}, {"code": "6446", "name": "藥華藥", "price": 1245.0, "chg": 3.32, "score": 100, "signals": ["型態", "籌碼", "趨勢", "題材"], "entry": "題材熱股", "prev_close": 1205.0, "prev_vol": 3326931, "volume": 3479314, "avg_price_5d": 1188.0, "upper_shadow_pct": 4.42, "vol_ma5": 1683104.0, "ma20_trend": "下彎", "consolidation_days": 0}];
 let sKey='score', sDir=-1, actSigs=new Set();
 
 function getFiltered() {
